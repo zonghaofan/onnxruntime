@@ -16,6 +16,7 @@ Status GemmlowpMultiplyu8u8_u8(const uint8_t* lhs_data, const uint8_t* rhs_data,
   gemmlowp::MatrixMap<std::uint8_t, matOrder> result(result_data, m, n);
 
   gemmlowp::GemmContext gemm_context;
+  gemm_context.set_max_num_threads(0);
 
   if (bias == nullptr) {
     auto output_pipeline = MakeOutputPipelineWithOutBias(result_offset,
@@ -41,6 +42,7 @@ Status GemmlowpMultiplyu8u8_s32(const uint8_t* lhs_data, const uint8_t* rhs_data
   gemmlowp::MatrixMap<std::int32_t, matOrder> result(result_data, m, n);
 
   gemmlowp::GemmContext gemm_context;
+  gemm_context.set_max_num_threads(0);
 
   const std::tuple<> empty_pipeline = {};
 

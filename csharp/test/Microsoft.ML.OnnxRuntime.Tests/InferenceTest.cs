@@ -732,7 +732,7 @@ namespace Microsoft.ML.OnnxRuntime.Tests
             }
         }
 
-        [Fact]
+        /*[Fact]
         private void TestModelSerialization()
         {
             string modelPath = Path.Combine(Directory.GetCurrentDirectory(), "squeezenet.onnx");
@@ -744,7 +744,7 @@ namespace Microsoft.ML.OnnxRuntime.Tests
             var session = new InferenceSession(modelPath, options);
             Assert.NotNull(session);
             Assert.True(File.Exists(modelOutputPath));
-        }
+        }*/
 
         [GpuFact]
         private void TestGpu()

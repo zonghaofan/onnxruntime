@@ -6,7 +6,7 @@
 
 namespace onnxruntime {
 
-Status GemmlowpMultiplyu8u8_u8(const uint8_t* lhs_data, const uint8_t* rhs_data, uint8_t* result_data,
+void GemmlowpMultiplyu8u8_u8(const uint8_t* lhs_data, const uint8_t* rhs_data, uint8_t* result_data,
                         const int lhs_offset, const int rhs_offset, const int result_offset,
                         int m, int n, int k, int32_t int_multiplier, int32_t right_shift, const int32_t* bias) {
   // TODO exp ColMajor order for rhs and result. That may be faster
@@ -29,13 +29,11 @@ Status GemmlowpMultiplyu8u8_u8(const uint8_t* lhs_data, const uint8_t* rhs_data,
                                      gemmlowp::DefaultL8R8BitDepthParams>(
         &gemm_context, lhs, rhs, &result, -lhs_offset, -rhs_offset, output_pipeline);
   }
-
-  return Status::OK();
 }
 
-Status GemmlowpMultiplyu8u8_s32(const uint8_t* lhs_data, const uint8_t* rhs_data, int32_t* result_data,
-                               const int lhs_offset, const int rhs_offset, int m, int n, int k) {
-  // TODO exp ColMajor order for rhs and result. That may be faster
+void GemmlowpMultiplyu8u8_s32(const uint8_t* lhs_data, const uint8_t* rhs_data, int32_t* result_data,
+                                const int lhs_offset, const int rhs_offset, int m, int n, int k, concurrency::ThreadPool* ) {
+
   const auto matOrder = gemmlowp::MapOrder::RowMajor;
   gemmlowp::MatrixMap<const uint8_t, matOrder> lhs(lhs_data, m, k);
   gemmlowp::MatrixMap<const uint8_t, matOrder> rhs(rhs_data, k, n);
@@ -49,6 +47,5 @@ Status GemmlowpMultiplyu8u8_s32(const uint8_t* lhs_data, const uint8_t* rhs_data
   gemmlowp::GemmWithOutputPipeline<std::uint8_t, std::int32_t, gemmlowp::DefaultL8R8BitDepthParams>(
       &gemm_context, lhs, rhs, &result, -lhs_offset, -rhs_offset, empty_pipeline);
 
-  return Status::OK();
 }
 }

@@ -12,8 +12,10 @@ namespace onnxruntime {
 
 namespace {
 bool IsFusableActivation(const Node& node) {
-  return graph_utils::IsSupportedOptypeVersionAndDomain(node, "LeakyRelu", {6}) ||
-         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Relu", {6}) ||
+  // Removing Leaky Relu fusion. Both Leaky Relu and Gemm have the same attribute alpha this causes model validation failure
+  // as the new fused node has 2 attributes named alpha. 
+  // TODO: Explore a better fix for this.
+  return graph_utils::IsSupportedOptypeVersionAndDomain(node, "Relu", {6}) ||
          graph_utils::IsSupportedOptypeVersionAndDomain(node, "Sigmoid", {6}) ||
          graph_utils::IsSupportedOptypeVersionAndDomain(node, "Tanh", {6});
 }
@@ -63,14 +65,6 @@ Status GemmActivationFusion::ApplyImpl(Graph& graph, bool& modified, int graph_l
 
     // Assign provider to this new node. Provider should be same as the provider for old node.
     fused_gemm.SetExecutionProviderType(gemm_node.GetExecutionProviderType());
-
-    //Add optional attributes for activations
-    if (act_node.OpType() == "LeakyRelu") {
-      const NodeAttributes& attrs = act_node.GetAttributes();
-      for (const auto& attr : attrs) {
-        fused_gemm.AddAttribute("leaky_relu_" + attr.first, attr.second);
-      }
-    }
 
     // move output definitions and edges from act_node to fused_gemm. delete gemm_node and act_node.
     graph_utils::FinalizeNodeFusion(graph, {gemm_node, act_node}, fused_gemm);

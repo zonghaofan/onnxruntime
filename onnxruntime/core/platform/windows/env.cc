@@ -51,6 +51,23 @@ struct FileHandleTraits {
 //       If that's important, consider using another cleanup method.
 using ScopedFileHandle = ScopedResource<FileHandleTraits>;
 
+// TProcessFn signature:
+// Status TProcessFn(
+//     size_t total_bytes_processed, DWORD bytes_to_process,
+//     DWORD& bytes_processed)
+template <typename TProcessFn>
+Status ProcessBytesInBatches(size_t total_bytes_to_process, DWORD max_bytes_per_batch, TProcessFn process_fn) {
+  size_t total_bytes_processed = 0;
+  while (total_bytes_processed < total_bytes_to_process) {
+    const DWORD bytes_to_process = gsl::narrow_cast<DWORD>(std::min<size_t>(
+        max_bytes_per_batch, total_bytes_to_process - total_bytes_processed));
+    DWORD bytes_processed{};
+    ORT_RETURN_IF_ERROR(process_fn(total_bytes_processed, bytes_to_process, bytes_processed));
+    total_bytes_processed += bytes_processed;
+  }
+  return Status::OK();
+}
+
 class WindowsEnv : public Env {
  public:
   void SleepForMicroseconds(int64_t micros) const override { Sleep(static_cast<DWORD>(micros) / 1000); }
@@ -88,7 +105,7 @@ class WindowsEnv : public Env {
     return GetCurrentProcessId();
   }
 
-  Status GetFileLength(const ORTCHAR_T* file_path, size_t& length) const override {
+  Status GetFileLength(const PathChar* file_path, size_t& length) const override {
     ScopedFileHandle file_handle{CreateFileW(
         file_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)};
     LARGE_INTEGER filesize;
@@ -104,17 +121,17 @@ class WindowsEnv : public Env {
   }
 
   Status ReadFileIntoBuffer(
-      const ORTCHAR_T* const file_path, const FileOffsetType offset, const size_t length,
+      const PathChar* const file_path, const FileOffsetType offset, const size_t length,
       const gsl::span<char> buffer) const override {
     ORT_RETURN_IF_NOT(file_path);
     ORT_RETURN_IF_NOT(offset >= 0);
     ORT_RETURN_IF_NOT(length <= buffer.size());
 
     ScopedFileHandle file_handle{CreateFileW(
-        file_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)};
+        file_path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
     if (!file_handle.IsValid()) {
       const int err = GetLastError();
-      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "open file ", ToMBString(file_path), " fail, errcode = ", err);
+      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "CreateFile ", ToMBString(file_path), " fail, errcode = ", err);
     }
 
     if (length == 0) return Status::OK();
@@ -128,31 +145,74 @@ class WindowsEnv : public Env {
       }
     }
 
-    size_t total_bytes_read = 0;
-    while (total_bytes_read < length) {
-      constexpr DWORD k_max_bytes_to_read = 1 << 30;  // read at most 1GB each time
-      const size_t bytes_remaining = length - total_bytes_read;
-      const DWORD bytes_to_read = static_cast<DWORD>(std::min<size_t>(bytes_remaining, k_max_bytes_to_read));
-      DWORD bytes_read;
+    static constexpr DWORD k_max_read_size = 1 << 30;  // 1GB
+    ORT_RETURN_IF_ERROR(ProcessBytesInBatches(
+        length, k_max_read_size,
+        [&file_handle, &buffer, &file_path](
+            size_t total_bytes_read, DWORD bytes_to_read, DWORD& bytes_read) -> Status {
+          if (!ReadFile(file_handle.Get(), buffer.data() + total_bytes_read, bytes_to_read, &bytes_read, nullptr)) {
+            const int err = GetLastError();
+            return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail, errcode = ", err);
+          }
 
-      if (!ReadFile(
-              file_handle.Get(), buffer.data() + total_bytes_read, bytes_to_read, &bytes_read, nullptr)) {
-        const int err = GetLastError();
-        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail, errcode = ", err);
-      }
+          if (bytes_read != bytes_to_read) {
+            return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail: unexpected end");
+          }
 
-      if (bytes_read != bytes_to_read) {
-        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail: unexpected end");
-      }
+          return Status::OK();
+        }));
 
-      total_bytes_read += bytes_read;
+    return Status::OK();
+  }
+
+  Status WriteBufferIntoFile(
+      gsl::span<const char> buffer,
+      const PathChar* file_path, FileOffsetType offset, size_t length) const override {
+    ORT_RETURN_IF_NOT(file_path);
+    ORT_RETURN_IF_NOT(offset >= 0);
+    ORT_RETURN_IF_NOT(length <= buffer.size());
+
+    ScopedFileHandle file_handle{CreateFileW(
+        file_path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    if (!file_handle.IsValid()) {
+      const int err = GetLastError();
+      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "CreateFile ", ToMBString(file_path), " fail, errcode = ", err);
     }
+
+    if (length == 0) return Status::OK();
+
+    if (offset > 0) {
+      LARGE_INTEGER current_position;
+      current_position.QuadPart = offset;
+      if (!SetFilePointerEx(file_handle.Get(), current_position, &current_position, FILE_BEGIN)) {
+        const int err = GetLastError();
+        return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "SetFilePointerEx ", ToMBString(file_path), " fail, errcode = ", err);
+      }
+    }
+
+    static constexpr DWORD k_max_write_size = 1 << 30;  // 1GB
+    ORT_RETURN_IF_ERROR(ProcessBytesInBatches(
+        length, k_max_write_size,
+        [&file_handle, &buffer, &file_path](
+            size_t total_bytes_written, DWORD bytes_to_write, DWORD& bytes_written) -> Status {
+          if (!WriteFile(
+                  file_handle.Get(), buffer.data() + total_bytes_written, bytes_to_write, &bytes_written, nullptr)) {
+            const int err = GetLastError();
+            return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "WriteFile ", ToMBString(file_path), " fail, errcode = ", err);
+          }
+
+          if (bytes_written != bytes_to_write) {
+            return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "WriteFile ", ToMBString(file_path), " fail: unexpected end");
+          }
+
+          return Status::OK();
+        }));
 
     return Status::OK();
   }
 
   Status MapFileIntoMemory(
-      const ORTCHAR_T*, FileOffsetType, size_t,
+      const PathChar*, FileOffsetType, size_t,
       MappedMemoryPtr&) const override {
     return ORT_MAKE_STATUS(ONNXRUNTIME, NOT_IMPLEMENTED, "MapFileIntoMemory is not implemented on Windows.");
   }

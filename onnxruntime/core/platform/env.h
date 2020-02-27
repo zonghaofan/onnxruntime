@@ -24,10 +24,10 @@ limitations under the License.
 #include <gsl/gsl>
 
 #include "core/common/common.h"
+#include "core/common/path_string.h"
 #include "core/framework/callback.h"
 #include "core/platform/env_time.h"
 #include "core/platform/telemetry.h"
-#include "core/session/onnxruntime_c_api.h"  // for ORTCHAR_T
 
 #ifndef _WIN32
 #include <sys/types.h>
@@ -81,18 +81,33 @@ class Env {
    * Gets the length of the specified file.
    */
   virtual common::Status GetFileLength(
-      const ORTCHAR_T* file_path, size_t& length) const = 0;
+      const PathChar* file_path, size_t& length) const = 0;
 
   /**
-   * Copies the content of the file into the provided buffer.
+   * Reads the content of the file into the provided buffer.
+   * Note: Zero-length reads will succeed if the file is readable.
    * @param file_path The path to the file.
    * @param offset The file offset from which to start reading.
    * @param length The length in bytes to read.
    * @param buffer The buffer in which to write.
    */
   virtual common::Status ReadFileIntoBuffer(
-      const ORTCHAR_T* file_path, FileOffsetType offset, size_t length,
+      const PathChar* file_path, FileOffsetType offset, size_t length,
       gsl::span<char> buffer) const = 0;
+
+  /**
+   * Writes the content of the buffer into the specified file.
+   * Note: Zero-length writes will succeed if the file is writable and will
+   * create an empty file if one does not exist. The file will not be extended
+   * to the offset.
+   * @param buffer The buffer from which to read.
+   * @param file_path The path to the file.
+   * @param offset The file offset from which to start writing.
+   * @param length The length in bytes to write.
+   */
+  virtual common::Status WriteBufferIntoFile(
+      gsl::span<const char> buffer,
+      const PathChar* file_path, FileOffsetType offset, size_t length) const = 0;
 
   using MappedMemoryPtr = std::unique_ptr<char[], OrtCallbackInvoker>;
 
@@ -107,7 +122,7 @@ class Env {
    *             unmaps the memory (unless release()'d) when destroyed.
    */
   virtual common::Status MapFileIntoMemory(
-      const ORTCHAR_T* file_path, FileOffsetType offset, size_t length,
+      const PathChar* file_path, FileOffsetType offset, size_t length,
       MappedMemoryPtr& mapped_memory) const = 0;
 
 #ifdef _WIN32

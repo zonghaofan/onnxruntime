@@ -33,11 +33,14 @@ limitations under the License.
 
 #include "core/common/common.h"
 #include "core/common/logging/logging.h"
+#include "core/platform/env_util.h"
 #include "core/platform/scoped_resource.h"
 
 namespace onnxruntime {
 
 namespace {
+
+constexpr size_t k_max_file_rw_bytes = 1 << 30;  // 1 GB
 
 constexpr int OneMillion = 1000000;
 
@@ -162,26 +165,59 @@ class PosixEnv : public Env {
       }
     }
 
-    size_t total_bytes_read = 0;
-    while (total_bytes_read < length) {
-      constexpr size_t k_max_bytes_to_read = 1 << 30;  // read at most 1GB each time
-      const size_t bytes_remaining = length - total_bytes_read;
-      const size_t bytes_to_read = std::min(bytes_remaining, k_max_bytes_to_read);
+    ORT_RETURN_IF_ERROR(detail::ProcessInBatches(
+        length, k_max_file_rw_bytes,
+        [&file_descriptor, &buffer, &file_path](
+            size_t total_bytes_read, size_t bytes_to_read, size_t& bytes_read) {
+          const ssize_t sbytes_read = TempFailureRetry(read, file_descriptor.Get(), buffer.data() + total_bytes_read, bytes_to_read);
 
-      const ssize_t bytes_read = TempFailureRetry(read, file_descriptor.Get(), buffer.data() + total_bytes_read, bytes_to_read);
+          if (sbytes_read < 0) {
+            return ReportSystemError("read", file_path);
+          }
 
-      if (bytes_read == -1) {
-        return ReportSystemError("read", file_path);
-      }
+          bytes_read = static_cast<size_t>(sbytes_read);
 
-      if (bytes_read == 0) {
-        return ORT_MAKE_STATUS(
-            ONNXRUNTIME, FAIL, "ReadFileIntoBuffer - unexpected end of file. ",
-            "File: ", file_path, ", offset: ", offset, ", length: ", length);
-      }
+          return Status::OK();
+        }));
 
-      total_bytes_read += bytes_read;
+    return Status::OK();
+  }
+
+  Status WriteBufferIntoFile(
+      gsl::span<const char> buffer,
+      const PathChar* file_path, FileOffsetType offset, size_t length) const override {
+    ORT_RETURN_IF_NOT(file_path);
+    ORT_RETURN_IF_NOT(offset >= 0);
+    ORT_RETURN_IF_NOT(length <= buffer.size());
+
+    ScopedFileDescriptor file_descriptor{open(file_path, O_WRONLY)};
+    if (!file_descriptor.IsValid()) {
+      return ReportSystemError("open", file_path);
     }
+
+    if (length == 0) return Status::OK();
+
+    if (offset > 0) {
+      const FileOffsetType seek_result = lseek(file_descriptor.Get(), offset, SEEK_SET);
+      if (seek_result == -1) {
+        return ReportSystemError("lseek", file_path);
+      }
+    }
+
+    ORT_RETURN_IF_ERROR(detail::ProcessInBatches(
+        length, k_max_file_rw_bytes,
+        [&file_descriptor, &buffer, &file_path](
+            size_t total_bytes_written, size_t bytes_to_write, size_t& bytes_written) {
+          const ssize_t sbytes_written = TempFailureRetry(write, file_descriptor.Get(), buffer.data() + total_bytes_written, bytes_to_write);
+
+          if (sbytes_written < 0) {
+            return ReportSystemError("write", file_path);
+          }
+
+          bytes_written = static_cast<size_t>(sbytes_written);
+
+          return Status::OK();
+        }));
 
     return Status::OK();
   }

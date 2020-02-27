@@ -28,12 +28,15 @@ limitations under the License.
 
 #include "core/common/logging/logging.h"
 #include "core/platform/env.h"
+#include "core/platform/env_util.h"
 #include "core/platform/scoped_resource.h"
 #include "core/platform/windows/telemetry.h"
 
 namespace onnxruntime {
 
 namespace {
+
+constexpr DWORD k_max_file_rw_bytes = 1 << 30;  // 1 GB
 
 struct FileHandleTraits {
   using Handle = HANDLE;
@@ -50,23 +53,6 @@ struct FileHandleTraits {
 // Note: File handle cleanup may fail but this class doesn't expose a way to check if it failed.
 //       If that's important, consider using another cleanup method.
 using ScopedFileHandle = ScopedResource<FileHandleTraits>;
-
-// TProcessFn signature:
-// Status TProcessFn(
-//     size_t total_bytes_processed, DWORD bytes_to_process,
-//     DWORD& bytes_processed)
-template <typename TProcessFn>
-Status ProcessBytesInBatches(size_t total_bytes_to_process, DWORD max_bytes_per_batch, TProcessFn process_fn) {
-  size_t total_bytes_processed = 0;
-  while (total_bytes_processed < total_bytes_to_process) {
-    const DWORD bytes_to_process = gsl::narrow_cast<DWORD>(std::min<size_t>(
-        max_bytes_per_batch, total_bytes_to_process - total_bytes_processed));
-    DWORD bytes_processed{};
-    ORT_RETURN_IF_ERROR(process_fn(total_bytes_processed, bytes_to_process, bytes_processed));
-    total_bytes_processed += bytes_processed;
-  }
-  return Status::OK();
-}
 
 class WindowsEnv : public Env {
  public:
@@ -145,18 +131,13 @@ class WindowsEnv : public Env {
       }
     }
 
-    static constexpr DWORD k_max_read_size = 1 << 30;  // 1GB
-    ORT_RETURN_IF_ERROR(ProcessBytesInBatches(
-        length, k_max_read_size,
+    ORT_RETURN_IF_ERROR(detail::ProcessInBatches(
+        length, k_max_file_rw_bytes,
         [&file_handle, &buffer, &file_path](
             size_t total_bytes_read, DWORD bytes_to_read, DWORD& bytes_read) -> Status {
           if (!ReadFile(file_handle.Get(), buffer.data() + total_bytes_read, bytes_to_read, &bytes_read, nullptr)) {
             const int err = GetLastError();
             return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail, errcode = ", err);
-          }
-
-          if (bytes_read != bytes_to_read) {
-            return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "ReadFile ", ToMBString(file_path), " fail: unexpected end");
           }
 
           return Status::OK();
@@ -190,19 +171,14 @@ class WindowsEnv : public Env {
       }
     }
 
-    static constexpr DWORD k_max_write_size = 1 << 30;  // 1GB
-    ORT_RETURN_IF_ERROR(ProcessBytesInBatches(
-        length, k_max_write_size,
+    ORT_RETURN_IF_ERROR(detail::ProcessInBatches(
+        length, k_max_file_rw_bytes,
         [&file_handle, &buffer, &file_path](
             size_t total_bytes_written, DWORD bytes_to_write, DWORD& bytes_written) -> Status {
           if (!WriteFile(
                   file_handle.Get(), buffer.data() + total_bytes_written, bytes_to_write, &bytes_written, nullptr)) {
             const int err = GetLastError();
             return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "WriteFile ", ToMBString(file_path), " fail, errcode = ", err);
-          }
-
-          if (bytes_written != bytes_to_write) {
-            return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "WriteFile ", ToMBString(file_path), " fail: unexpected end");
           }
 
           return Status::OK();

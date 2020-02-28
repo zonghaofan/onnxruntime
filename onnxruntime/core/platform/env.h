@@ -95,6 +95,7 @@ class Env {
       const PathChar* file_path, FileOffsetType offset, size_t length,
       gsl::span<char> buffer) const = 0;
 
+  // TODO should this write function also flush to disk?
   /**
    * Writes the content of the buffer into the specified file.
    * Note: Zero-length writes will succeed if the file is writable and will

@@ -158,6 +158,7 @@ Status QAttention<T, int8_t>::ComputeInternal(OpKernelContext* context) const {
   }
   // scale back and bias
   CudaDequantizeWithBias(
+      Stream(),
       gemm_buffer_quantized.get(),
       reinterpret_cast<const CudaT*>(bias->template Data<T>()),
       reinterpret_cast<CudaT*>(gemm_buffer.get()),
@@ -171,6 +172,7 @@ Status QAttention<T, int8_t>::ComputeInternal(OpKernelContext* context) const {
   size_t workSpaceSize = GetAttentionWorkspaceSize(element_size, batch_size, num_heads_, head_size, sequence_length, past_sequence_length);
   auto temp_buffer = GetScratchBuffer<void>(workSpaceSize);
   if (!LaunchAttentionKernel(
+          Stream(),
           reinterpret_cast<const CudaT*>(gemm_buffer.get()),
           nullptr == mask_index ? nullptr : mask_index->template Data<int>(),
           nullptr == mask_index ? nullptr : &(mask_index->Shape().GetDims()),

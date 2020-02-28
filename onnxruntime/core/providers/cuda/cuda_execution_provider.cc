@@ -58,9 +58,16 @@ ONNX_OPERATOR_KERNEL_EX(
 
 CUDAExecutionProvider::PerThreadContext::PerThreadContext(OrtDevice::DeviceId device_id, size_t cuda_mem_limit, ArenaExtendStrategy arena_extend_strategy) {
   CUDA_CALL_THROW(cudaSetDevice(device_id));
+  CUDA_CALL_THROW(cudaStreamCreateWithFlags(&stream_, cudaStreamNonBlocking));
+
   CUBLAS_CALL_THROW(cublasCreate(&cublas_handle_));
+  CUBLAS_CALL_THROW(cublasSetStream(cublas_handle_, stream_));
+
   CUDNN_CALL_THROW(cudnnCreate(&cudnn_handle_));
+  CUDNN_CALL_THROW(cudnnSetStream(cudnn_handle_, stream_));
+
   CURAND_CALL_THROW(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
+  CURAND_CALL_THROW(curandSetStream(curand_generator_, stream_));
 
   DeviceAllocatorRegistrationInfo default_memory_info(
       {OrtMemTypeDefault,
@@ -94,6 +101,12 @@ CUDAExecutionProvider::PerThreadContext::~PerThreadContext() {
     CURAND_CALL_THROW(curandDestroyGenerator(curand_generator_));
   } catch (const std::exception& ex) {
     LOGS_DEFAULT(ERROR) << "curandDestroyGenerator threw:" << ex.what();
+  }
+
+  try {
+    CUDA_CALL(cudaStreamDestroy(stream_));
+  } catch (const std::exception& ex) {
+    LOGS_DEFAULT(ERROR) << "cudaStreamDestroy threw:" << ex.what();
   }
 }
 
@@ -1398,7 +1411,7 @@ static bool CastNeedFallbackToCPU(const onnxruntime::Node& node) {
 }
 
 std::unique_ptr<onnxruntime::IDataTransfer> CUDAExecutionProvider::GetDataTransfer() const {
-  return onnxruntime::make_unique<onnxruntime::GPUDataTransfer>();
+  return onnxruntime::make_unique<onnxruntime::GPUDataTransfer>(this);
 }
 
 std::vector<std::unique_ptr<ComputeCapability>>

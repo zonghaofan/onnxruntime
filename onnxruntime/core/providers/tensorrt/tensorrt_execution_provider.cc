@@ -1168,7 +1168,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
                 }
               }
               CUDA_RETURN_IF_ERROR(cudaMalloc(&buffers[binding_index], input_dim_size * sizeof(int32_t)));
-              cuda::Impl_Cast<int64_t, int32_t>(input_tensor_ptr, reinterpret_cast<int32_t*>(buffers[binding_index]), input_dim_size);
+              cuda::Impl_Cast<int64_t, int32_t>(Stream(), input_tensor_ptr, reinterpret_cast<int32_t*>(buffers[binding_index]), input_dim_size);
             }
             binding_buffers_to_freeup.push_back(binding_index);
             break;
@@ -1311,7 +1311,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
         if (output_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64) {
           auto output_tensor_ptr = ort.GetTensorMutableData<int64_t>(output_tensor[i]);
           if (output_tensor_ptr != nullptr) {
-            cuda::Impl_Cast<int32_t, int64_t>(reinterpret_cast<int32_t*>(buffers[binding_index]), output_tensor_ptr, output_dim_sizes[i]);
+            cuda::Impl_Cast<int32_t, int64_t>(Stream(), reinterpret_cast<int32_t*>(buffers[binding_index]), output_tensor_ptr, output_dim_sizes[i]);
           }
         }
       }

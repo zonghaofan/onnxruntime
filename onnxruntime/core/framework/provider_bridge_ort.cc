@@ -516,7 +516,7 @@ struct ProviderLibrary {
   }
 
   ~ProviderLibrary() {
-    Env::Default().UnloadDynamicLibrary(handle_);
+//    Env::Default().UnloadDynamicLibrary(handle_);
   }
 
   Provider* provider_{};

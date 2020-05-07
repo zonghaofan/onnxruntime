@@ -860,7 +860,7 @@ int main(int argc, char* argv[]) {
 
 
 #ifdef _WIN32
-#ifdef _DEBUG
+#ifndef _DEBUG
 
 LONG WINAPI UnHandledExceptionFilter(EXCEPTION_POINTERS* exception_pointers) {
   EXCEPTION_RECORD& exception = *(exception_pointers->ExceptionRecord);

@@ -855,6 +855,48 @@ int main(int argc, char* argv[]) {
     retval = -1;
   }
   ::google::protobuf::ShutdownProtobufLibrary();
-  std::cout << "*** Exiting Test Runner\r\n";
   return retval;
 }
+
+
+#ifdef _WIN32
+#ifdef _DEBUG
+
+LONG WINAPI UnHandledExceptionFilter(EXCEPTION_POINTERS* exception_pointers) {
+  EXCEPTION_RECORD& exception = *(exception_pointers->ExceptionRecord);
+
+  std::cout << "******  Crashed: ";
+
+  switch (exception.ExceptionCode) {
+    case EXCEPTION_ACCESS_VIOLATION:
+      std::cout << "Access violation ";
+      std::cout << (exception.ExceptionInformation[0] == 0 ? "reading from" : "writing to") << " address " << std::hex << exception.ExceptionInformation[1];
+      break;
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+      std::cout << "Array bounds exceeded";
+      break;
+    case EXCEPTION_DATATYPE_MISALIGNMENT:
+      std::cout << "Data type misalignment";
+      break;
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+      std::cout << "Illegal instruction";
+      break;
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+      std::cout << "Integer divide by zero";
+      break;
+    case EXCEPTION_STACK_OVERFLOW:
+      std::cout << "Stack overflow";
+      break;
+    default:
+      std::cout << "Exception Code:" << std::hex << exception.ExceptionCode;
+  }
+
+  std::cout << " at " << std::hex << exception.ExceptionAddress;
+  std::cout << "\r\n\r\n";
+
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+bool InitCrashHandler = (SetUnhandledExceptionFilter(UnHandledExceptionFilter), false);
+#endif
+#endif

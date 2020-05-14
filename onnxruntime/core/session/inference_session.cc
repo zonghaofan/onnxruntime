@@ -941,7 +941,7 @@ common::Status InferenceSession::Initialize() {
     }
   }
 
-  //Debug();
+  Debug();
 
   return status;
 }

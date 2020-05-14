@@ -54,22 +54,22 @@ Status OneHotOp<in_type, out_type, depth_type>::ComputeInternal(OpKernelContext*
   // allocate output
   const auto* values_data = reinterpret_cast<const CudaT_Out*>(values->Data<out_type>());
   Tensor* output = ctx->Output(0, TensorShape(output_shape));
+  CUDA_RETURN_IF_ERROR(cudaMemset(output->MutableDataRaw(), 0, output->SizeInBytes()));
 
   // edge case where we have a dim with a value of 0
   if (output->Shape().Size() == 0)
     return Status::OK();
 
-  const fast_divmod fdm_depth_suffix(gsl::narrow_cast<int>(depth_val * suffix_dim_size));
-  const fast_divmod fdm_suffix(gsl::narrow_cast<int>(suffix_dim_size));
+  //const fast_divmod fdm_depth_suffix(gsl::narrow_cast<int>(depth_val * suffix_dim_size));
+  //const fast_divmod fdm_suffix(gsl::narrow_cast<int>(suffix_dim_size));
 
   const auto* indices_data = indices->Data<in_type>();
   auto* output_data = reinterpret_cast<CudaT_Out*>(output->MutableData<out_type>());
 
-  OneHotImpl(indices_data, fdm_depth_suffix, fdm_suffix, depth_val,
+  OneHotImpl(indices_data, depth_val,
              values_data[1],
-             values_data[0],
              output_data,
-             output->Shape().Size());
+             indices->Shape().Size());
 
   return Status::OK();
 }

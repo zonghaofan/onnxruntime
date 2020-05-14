@@ -499,7 +499,7 @@ void TrainingSession::AddPredefinedTransformers(GraphTransformerManager& transfo
 void TrainingSession::Debug() {
   printf("TrainingSession::Debug\n");
   Save(PathString("unilm_running.onnx"), SaveOption::NO_RELOAD);
-  GraphViewer graph_viewer(model_->MainGraph());
+  /*GraphViewer graph_viewer(model_->MainGraph());
   const auto& node_topology_list = graph_viewer.GetNodesInTopologicalOrder();
   for (auto node_index : node_topology_list) {
     auto& node = *model_->MainGraph().GetNode(node_index);
@@ -530,7 +530,7 @@ void TrainingSession::Debug() {
         printf("]\n");
       }
     }
-  }
+  }*/
 }
 
 Status TrainingSession::AddGistEncoding() {

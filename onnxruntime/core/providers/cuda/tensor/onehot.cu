@@ -37,17 +37,38 @@ __global__ void _OneHotImpl(
   output_data[id] = (is_valid_range && adjusted_indice == in_type(depth_index)) ? on_value : off_value;
 }
 
+template<typename in_type, typename out_type>
+__global__ void _QuickOneHotImpl(
+    const int64_t batch_size,
+    const int64_t index_size,
+    const in_type* indices_data,
+    const out_type on_value,
+    out_type* output_data,
+    CUDA_LONG N) {
+  CALCULATE_ELEMENTWISE_INDEX_OR_EXIT(id, N);
+  output_data[id * index_size + indices_data[id]] = on_value;
+}
+
 template <typename in_type, typename out_type>
 void OneHotImpl(
     const in_type* indices_data,
-    const fast_divmod fdm_depth_suffix,
-    const fast_divmod fdm_suffix,
+    //const fast_divmod fdm_depth_suffix,
+    //const fast_divmod fdm_suffix,
     const int64_t depth_val,
     const out_type on_value,
-    const out_type off_value,
+    //const out_type off_value,
     out_type* output_data,
     size_t count) {
   int blocksPerGrid = (int)(ceil(static_cast<float>(count) / GridDim::maxThreadsPerBlock));
+  CUDA_LONG N = static_cast<CUDA_LONG>(count);
+  _QuickOneHotImpl<in_type, out_type><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0>>>(
+    count,
+    depth_val,
+    indices_data,
+    on_value,
+    output_data,
+    N);
+  /*int blocksPerGrid = (int)(ceil(static_cast<float>(count) / GridDim::maxThreadsPerBlock));
   CUDA_LONG N = static_cast<CUDA_LONG>(count);
   _OneHotImpl<in_type, out_type><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0>>>(
     indices_data,
@@ -57,17 +78,14 @@ void OneHotImpl(
     on_value,
     off_value,
     output_data,
-    N);
+    N);*/
 }
 
 #define SPECIALIZED_OneHotImpl(in_type, out_type) \
   template void OneHotImpl(                       \
     const in_type* indices_data,                  \
-    const fast_divmod fdm_depth_suffix,           \
-    const fast_divmod fdm_suffix,                 \
     const int64_t depth_val,                      \
     const out_type on_value,                      \
-    const out_type off_value,                     \
     out_type* output_data,                        \
     size_t count);
 

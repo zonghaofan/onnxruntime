@@ -12,11 +12,11 @@ namespace cuda {
 template <typename in_type, typename out_type>
 void OneHotImpl(
     const in_type* indices,
-    const fast_divmod fdm_depth_suffix,
-    const fast_divmod fdm_suffix,
+    //const fast_divmod fdm_depth_suffix,
+    //const fast_divmod fdm_suffix,
     const int64_t depth_val,
     const out_type on_value,
-    const out_type off_value,
+    //const out_type off_value,
     out_type* output,
     size_t count);
 

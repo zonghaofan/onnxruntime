@@ -9,10 +9,11 @@ import torch
 import torch.nn
 import torch.onnx
 import onnxruntime as ort
+import onnxruntime.capi.postprocess as postprocess
 from distutils.version import LooseVersion
 from .checkpointing_utils import list_checkpoint_files, get_checkpoint_name, CombineZeroCheckpoint
 
-DEFAULT_OPSET_VERSION = 10
+DEFAULT_OPSET_VERSION = 12
 
 class IODescription():
     def __init__(self, name, shape, dtype=None, num_classes=None):
@@ -123,62 +124,6 @@ class model_loss_cls(torch.nn.Module):
         return self.loss_fn_(preds, label), preds
 
 
-def FuseSofmaxNLLToSoftmaxCE(onnx_model):
-    nll_count = 0
-    while True:
-        nll_count = nll_count + 1
-        nll_loss_node = None
-        nll_loss_node_index = 0
-        for nll_loss_node_index, node in enumerate(onnx_model.graph.node):
-            if node.op_type == "nll_loss" or node.op_type == "NegativeLogLikelihoodLoss":
-                nll_loss_node = node
-                break
-
-        if nll_loss_node is None:
-            break
-
-        softmax_node = None
-        softmax_node_index = 0
-        label_input_name = None
-        weight_input_name = None
-        for softmax_node_index, node in enumerate(onnx_model.graph.node):
-            if node.op_type == "LogSoftmax":
-                # has to be connected to nll_loss
-                if len(nll_loss_node.input) > 2:
-                    weight_input_name = nll_loss_node.input[2]
-                if node.output[0] == nll_loss_node.input[0]:
-                    softmax_node = node
-                    label_input_name = nll_loss_node.input[1]
-                    break
-                elif node.output[0] == nll_loss_node.input[1]:
-                    softmax_node = node
-                    label_input_name = nll_loss_node.input[0]
-                    break
-            else:
-                if softmax_node is not None:
-                    break
-
-        if softmax_node is None:
-            break
-
-        # delete nll_loss and LogSoftmax nodes in order
-        if nll_loss_node_index < softmax_node_index:
-            del onnx_model.graph.node[softmax_node_index]
-            del onnx_model.graph.node[nll_loss_node_index]
-        else:
-            del onnx_model.graph.node[nll_loss_node_index]
-            del onnx_model.graph.node[softmax_node_index]
-
-        probability_output_name = softmax_node.output[0]
-        node = onnx_model.graph.node.add()
-        inputs = [softmax_node.input[0], label_input_name, weight_input_name] if weight_input_name else [softmax_node.input[0], label_input_name]
-        node.CopyFrom(onnx.helper.make_node("SparseSoftmaxCrossEntropy", inputs,
-                                            [nll_loss_node.output[0], probability_output_name],
-                                            "nll_loss_node_" + str(nll_count)))
-
-    return onnx_model
-
-
 def delete_input_with_name(input, name):
     index = 0
     for i in input:
@@ -258,7 +203,7 @@ def wrap_for_input_match(model, input_names):
     model = WrapModel(model, input_names)
     return model
 
-def convert_model_loss_fn_to_onnx(model, loss_fn, model_desc, device, inputs, opset_version=DEFAULT_OPSET_VERSION):
+def convert_model_loss_fn_to_onnx(model, loss_fn, model_desc, device, inputs, opset_version=DEFAULT_OPSET_VERSION, _enable_internal_postprocess=True):
     # example: {input0:{0:'batch'}, input1:{0:'batch'}}
     dynamic_axes = {}
     for input in model_desc.inputs_:
@@ -320,7 +265,7 @@ def convert_model_loss_fn_to_onnx(model, loss_fn, model_desc, device, inputs, op
                        output_names=output_names,
                        opset_version=opset_version,
                        dynamic_axes=dynamic_axes,
-                       training=True,
+                       training=torch.onnx.TrainingMode.TRAINING,
                        _retain_param_name=True,
                        example_outputs=tuple(sample_outputs),
                        do_constant_folding=False,
@@ -328,7 +273,8 @@ def convert_model_loss_fn_to_onnx(model, loss_fn, model_desc, device, inputs, op
 
     model = onnx.load_model_from_string(f.getvalue())
 
-    model = FuseSofmaxNLLToSoftmaxCE(model)
+    if _enable_internal_postprocess:
+        model = postprocess.run_postprocess(model)
 
     return model
 
@@ -481,10 +427,10 @@ def load_checkpoint(model, checkpoint_dir, checkpoint_prefix="ORT_checkpoint", s
 class ORTTrainer():
 
     def __init__(self, model, loss_fn, model_desc, training_optimizer_name, map_optimizer_attributes,
-                 learning_rate_description, device, gradient_accumulation_steps=1, postprocess_model=None,
+                 learning_rate_description, device, gradient_accumulation_steps=1,
                  world_rank=0, world_size=1, use_mixed_precision=False, allreduce_post_accumulation=False,
                  global_step=0, get_lr_this_step=None, loss_scaler=None, partition_optimizer=False,
-                 enable_grad_norm_clip=True, frozen_weights=[], _opset_version=DEFAULT_OPSET_VERSION):
+                 enable_grad_norm_clip=True, frozen_weights=[], _opset_version=DEFAULT_OPSET_VERSION, _enable_internal_postprocess=True, _extra_postprocess=None):
         super(ORTTrainer, self).__init__()
         """
         Initializes ORTTrainer.
@@ -548,7 +494,7 @@ class ORTTrainer():
         # we use self.global_step_ to count optimizations being performed.
         # it is used to calculate learning rate if self.get_lr_this_step_ is provided.
         self.global_step_ = global_step
-        self.post_process_model_fn_ = postprocess_model
+        self._extra_postprocess = _extra_postprocess
         self.get_lr_this_step_ = get_lr_this_step
         self.loss_scaler_ = loss_scaler
 
@@ -563,6 +509,7 @@ class ORTTrainer():
         self.frozen_weights_ = frozen_weights
         self.opset_version_ = _opset_version
         self.state_dict_ = None
+        self._enable_internal_postprocess = _enable_internal_postprocess
 
         # use this special string to workaround a corner case that external loss_scale is passed into train_step as kwargs.
         # see prepare_input_and_fetches for more details.
@@ -573,6 +520,12 @@ class ORTTrainer():
     def _init_session(self):
         if self.onnx_model_ is None:
             return
+        
+        if self._enable_internal_postprocess:
+            self._onnx_model_ = postprocess.run_postprocess(self.onnx_model_)
+
+        if self._extra_postprocess:
+            self._extra_postprocess(self.onnx_model_)
 
         self._verify_fully_optimized_model(self.onnx_model_)
         self.session, self.train_io_binding, self.eval_io_binding, self.output_name, _, self.output_types = \
@@ -626,10 +579,10 @@ class ORTTrainer():
             # NOTE: pt model is moved to cpu to conserve gpu memory.
             self.torch_model_.cpu()
             self.onnx_model_ = convert_model_loss_fn_to_onnx(
-                self.torch_model_, self.loss_fn_, self.model_desc_, torch.device('cpu'), inputs, opset_version=self.opset_version_)
+                self.torch_model_, self.loss_fn_, self.model_desc_, torch.device('cpu'), inputs, opset_version=self.opset_version_, _enable_internal_postprocess=self._enable_internal_postprocess)
 
-            if self.post_process_model_fn_:
-                self.post_process_model_fn_(self.onnx_model_)
+            if self._extra_postprocess:
+                self._extra_postprocess(self.onnx_model_)
 
         self._init_session()
 

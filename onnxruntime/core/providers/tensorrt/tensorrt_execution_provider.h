@@ -53,10 +53,9 @@ struct TensorrtFuncState {
   nvinfer1::IExecutionContext* context = nullptr;
   nvinfer1::IBuilder* builder = nullptr;
   nvinfer1::INetworkDefinition* network = nullptr;
-  std::vector<std::vector<int>> input_info;
-  std::vector<std::vector<int>> output_info;
-  std::unordered_map<int, std::unordered_map<int, std::pair<int64_t, int64_t>>> input_shape_ranges;
-  std::vector<std::vector<int64_t>> output_shapes;
+  std::vector<std::unordered_map<std::string,int>> input_info;
+  std::vector<std::unordered_map<std::string,int>> output_info;
+  std::unordered_map<std::string, std::unordered_map<int, std::pair<int64_t, int64_t>>> input_shape_ranges;
   OrtMutex* tensorrt_mu_ptr = nullptr;
   bool* fp16_enable_ptr = nullptr;
   size_t* max_workspace_size_ptr = nullptr;
@@ -108,10 +107,9 @@ class TensorrtExecutionProvider : public IExecutionProvider {
   std::unordered_map<std::string, unique_pointer<nvinfer1::IExecutionContext>> contexts_;
   std::unordered_map<std::string, unique_pointer<nvinfer1::IBuilder>> builders_;
   std::unordered_map<std::string, unique_pointer<nvinfer1::INetworkDefinition>> networks_;
-  std::unordered_map<std::string, std::vector<std::vector<int>>> input_info_;
-  std::unordered_map<std::string, std::vector<std::vector<int>>> output_info_;
-  std::unordered_map<std::string, std::unordered_map<int, std::unordered_map<int, std::pair<int64_t, int64_t>>>> input_shape_ranges_;
-  std::unordered_map<std::string, std::vector<std::vector<int64_t>>> output_shapes_;
+  std::unordered_map<std::string, std::vector<std::unordered_map<std::string, int>>> input_info_;
+  std::unordered_map<std::string, std::vector<std::unordered_map<std::string, int>>> output_info_;
+  std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<int, std::pair<int64_t, int64_t>>>> input_shape_ranges_;
 
   /**Get IndexedSubGraph based on node list of the subgraph*/
   std::unique_ptr<IndexedSubGraph> GetSubGraph(SubGraph_t graph_nodes_index, int& kernels_index,

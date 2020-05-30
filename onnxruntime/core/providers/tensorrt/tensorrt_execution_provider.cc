@@ -199,7 +199,8 @@ SubGraphCollection_t RemoveEmptyShapeNodes(const onnxruntime::GraphViewer& graph
   // Here only NonZero, NonMaxSuppression and TopK related empty shape nodes are removed, particularly for RCNN models.
   // TODO: Remove the code if TensorRT fixed the issue in the future release, or find a better generic way here to work around
   const std::vector<NodeIndex>& node_index = graph.GetNodesInTopologicalOrder();
-  const std::vector<std::string> exclude_dim_names{"NonZero", "NonMaxSuppression", "TopK"};
+  ///const std::vector<std::string> exclude_dim_names{"NonZero", "NonMaxSuppression", "TopK"};
+  const std::vector<std::string> exclude_dim_names;
   SubGraphCollection_t parser_nodes_vector = {{{}, false}};
   std::vector<size_t> nodes_vector(node_index.size());
   std::iota(std::begin(nodes_vector), std::end(nodes_vector), 0);

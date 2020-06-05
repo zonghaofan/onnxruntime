@@ -60,4 +60,5 @@
 	url = https://github.com/dcleblanc/SafeInt.git
 [submodule "cmake/external/onnx-tensorrt"]
 	path = cmake/external/onnx-tensorrt
-	url = https://github.com/stevenlix/onnx-tensorrt.git
+	url = https://github.com/kevinch-nv/onnx-tensorrt.git
+	branch = 7.1

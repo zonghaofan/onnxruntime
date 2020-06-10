@@ -941,6 +941,8 @@ common::Status InferenceSession::Initialize() {
     }
   }
 
+  Debug();
+
   return status;
 }
 
@@ -1486,6 +1488,10 @@ void InferenceSession::AddPredefinedTransformers(GraphTransformerManager& transf
       add_transformers(level);
     }
   }
+}
+
+void InferenceSession::Debug() {
+  printf("InferenceSession::Debug\n");
 }
 
 common::Status InferenceSession::WaitForNotification(Notification* p_executor_done, int64_t timeout_in_ms) {

@@ -581,8 +581,8 @@ class ORTTrainer():
             self.onnx_model_ = convert_model_loss_fn_to_onnx(
                 self.torch_model_, self.loss_fn_, self.model_desc_, torch.device('cpu'), inputs, opset_version=self.opset_version_, _enable_internal_postprocess=self._enable_internal_postprocess)
 
-            if self._extra_postprocess:
-                self._extra_postprocess(self.onnx_model_)
+            #if self._extra_postprocess:
+            #    self._extra_postprocess(self.onnx_model_)
 
         self._init_session()
 

@@ -197,6 +197,40 @@ Status TrainingSession::ConfigureForTraining(
                                  << weight_names_stream.str();
   }
 
+  Save(PathString("/unilm/models/unilm_optimized.onnx"), SaveOption::NO_RELOAD);
+  GraphViewer graph_viewer(model_->MainGraph());
+  const auto& node_topology_list = graph_viewer.GetNodesInTopologicalOrder();
+  for (auto node_index : node_topology_list) {
+    auto& node = *model_->MainGraph().GetNode(node_index);
+    printf("%s:\n", node.Name().c_str());
+    for (auto* output : node.MutableOutputDefs())
+    {
+      printf("    %s: ", output->Name().c_str());
+      const ONNX_NAMESPACE::TensorShapeProto* shape = output->Shape();
+      if (shape == nullptr) {
+        printf("nullptr\n");
+      } else {
+        printf("[");
+        int rank = shape->dim_size();
+        if (rank > 0) {
+          if (shape->dim(0).has_dim_value())
+            printf("%d", (int)shape->dim(0).dim_value());
+          else if (shape->dim(0).has_dim_param())
+            printf("%s", shape->dim(0).dim_param().c_str());
+          else printf("?");
+          for (int i = 1; i < rank; i++) {
+            if (shape->dim(i).has_dim_value())
+              printf(", %d", (int)shape->dim(i).dim_value());
+            else if (shape->dim(i).has_dim_param())
+              printf(", %s", shape->dim(i).dim_param().c_str());
+            else printf(", ?");
+          }
+        }
+        printf("]\n");
+      }
+    }
+  }
+
   ORT_RETURN_IF_ERROR(BuildGradientGraph(
       weight_names_to_train, loss_name, config.set_gradients_as_graph_outputs));
 
@@ -492,6 +526,43 @@ void TrainingSession::AddPredefinedTransformers(GraphTransformerManager& transfo
     TransformerLevel level = static_cast<TransformerLevel>(i);
     if ((graph_optimization_level >= level) || !custom_list.empty()) {
       add_transformers(level);
+    }
+  }
+}
+
+void TrainingSession::Debug() {
+  printf("TrainingSession::Debug\n");
+  Save(PathString("/unilm/models/unilm_running.onnx"), SaveOption::NO_RELOAD);
+  GraphViewer graph_viewer(model_->MainGraph());
+  const auto& node_topology_list = graph_viewer.GetNodesInTopologicalOrder();
+  for (auto node_index : node_topology_list) {
+    auto& node = *model_->MainGraph().GetNode(node_index);
+    printf("%s:\n", node.Name().c_str());
+    for (auto* output : node.MutableOutputDefs())
+    {
+      printf("    %s: ", output->Name().c_str());
+      const ONNX_NAMESPACE::TensorShapeProto* shape = output->Shape();
+      if (shape == nullptr) {
+        printf("nullptr\n");
+      } else {
+        printf("[");
+        int rank = shape->dim_size();
+        if (rank > 0) {
+          if (shape->dim(0).has_dim_value())
+            printf("%d", (int)shape->dim(0).dim_value());
+          else if (shape->dim(0).has_dim_param())
+            printf("%s", shape->dim(0).dim_param().c_str());
+          else printf("?");
+          for (int i = 1; i < rank; i++) {
+            if (shape->dim(i).has_dim_value())
+              printf(", %d", (int)shape->dim(i).dim_value());
+            else if (shape->dim(i).has_dim_param())
+              printf(", %s", shape->dim(i).dim_param().c_str());
+            else printf(", ?");
+          }
+        }
+        printf("]\n");
+      }
     }
   }
 }

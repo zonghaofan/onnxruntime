@@ -82,8 +82,26 @@ void ComputeBroadcastBackwardAxes(
   }
 }
 
+bool HasConcreteShape(const ArgDef& arg_def) {
+  if (!(arg_def.type_proto && arg_def.type_proto->has_tensor_type() && arg_def.type_proto->tensor_type().has_shape())) {
+    return false;
+  }
+
+  std::vector<Dimension> data_shape = GetShape(arg_def);
+  for (auto dim : data_shape) {
+    if (!dim.has_dim_value()) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
 std::vector<Dimension> GetShape(const ArgDef& arg_def) {
-  ORT_ENFORCE(arg_def.type_proto, "During GetShape, ", arg_def.name, "'s type_proto is null.");
+  ORT_ENFORCE(arg_def.type_proto
+              && arg_def.type_proto->has_tensor_type()
+              && arg_def.type_proto->tensor_type().has_shape(),
+              "During GetShape, ", arg_def.name, "'s shape is null.");
   std::vector<Dimension> shape;
   const auto& dims = arg_def.type_proto->tensor_type().shape().dim();
   for (auto dim = dims.begin(); dim < dims.end(); dim++) {

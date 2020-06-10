@@ -37,36 +37,8 @@ static const std::unordered_set<std::string> FP32_Nodes = {
     "SoftmaxCrossEntropyLoss",
     "SoftmaxCrossEntropyLossGrad"};
 
-static const std::unordered_set<std::string> FP32_Node_Names = {
-    /*"Mul_1105", "ReduceSum_1106", "Add_1108", "Div_1109", "ReduceSum_1110",
-    "Mul_1200", "ReduceSum_1201", "Add_1203", "Div_1204", "ReduceSum_1205",
-    "Mul_1207", "Mul_1209", "Add_1210", "scaled_loss",
-    "scaled_loss_Grad/Mul_0", "scaled_loss_Grad/ReduceSum_1",
-    "Mul_1207_Grad/Mul_0", "ReduceSum_1110_Grad/Unsqueeze_0", "ReduceSum_1110_Grad/Tile_2", "Div_1109_Grad/Div_0", "Mul_1105_Grad/Mul_0",
-    "Mul_1209_Grad/Mul_0", "ReduceSum_1205_Grad/Unsqueeze_0", "ReduceSum_1205_Grad/Tile_2", "Div_1204_Grad/Div_0", "Mul_1200_Grad/Mul_0"*/
-    "Mul_4315", "ReduceSum_4316", "Add_4318", "Div_4319", "ReduceSum_4320",
-    "Mul_4410", "ReduceSum_4411", "Add_4413", "Div_4414", "ReduceSum_4415",
-    "Mul_4417", "Mul_4419", "Add_4420", "scaled_loss",
-    "scaled_loss_Grad/Mul_0", "scaled_loss_Grad/ReduceSum_1",
-    "Mul_4417_Grad/Mul_0", "ReduceSum_4320_Grad/Unsqueeze_0", "ReduceSum_4320_Grad/Tile_2", "Div_4319_Grad/Div_0", "Mul_4315_Grad/Mul_0",
-    "Mul_4419_Grad/Mul_0", "ReduceSum_4415_Grad/Unsqueeze_0", "ReduceSum_4415_Grad/Tile_2", "Div_4414_Grad/Div_0", "Mul_4410_Grad/Mul_0"
-};
-
-static const std::unordered_set<std::string> FP32_Output_Nodes = {
-  //"1171", "1266", "1270", "1272", "SoftmaxCrossEntropyLoss_1102", "SoftmaxCrossEntropyLoss_1197", "Cast_1104", "Cast_1199", "scaled_loss_grad"
-  "4591", "4686", "4690", "4692", "SoftmaxCrossEntropyLoss_4312", "SoftmaxCrossEntropyLoss_4407", "Cast_4314", "Cast_4409", "scaled_loss_grad"
-};
-
 bool IsFP32Node(const Node* node) {
-  if (FP32_Nodes.find(node->OpType()) != FP32_Nodes.cend()) {
-    return true;
-  }
-
-  if (FP32_Node_Names.find(node->Name()) != FP32_Node_Names.cend()) {
-    return true;
-  }
-
-  return false;
+  return FP32_Nodes.find(node->OpType()) != FP32_Nodes.cend();
 }
 
 // At present, we use these table to identify which input needs to be keep in FP32
@@ -250,10 +222,6 @@ Status TransformConstants(Graph& graph) {
   // to avoid modifying the graph while iterating through it.
   std::unordered_set<NodeArg*> toFP16;
   for (auto& node : graph.Nodes()) {
-    if (FP32_Output_Nodes.find(node.Name()) != FP32_Output_Nodes.cend()) {
-      continue;
-    }
-
     const std::string& optype = node.OpType();
     // TODO: Why do we need to handle "Cast" here?
     if ((optype == "Constant") || (optype == "Cast") || (optype == "ConstantOfShape")) {
@@ -266,37 +234,6 @@ Status TransformConstants(Graph& graph) {
   for (auto* tensor : toFP16) {
     ORT_RETURN_IF_ERROR(CastNodeArg(graph, stage1_fp32_node_args, tensor, ONNX_NAMESPACE::TensorProto_DataType_FLOAT16));
   }
-  return Status::OK();
-}
-
-Status TransformStage1Point5(Graph& graph) {
-  std::unordered_set<NodeArg*> toFP16, toFP32;
-  for (auto& node : graph.Nodes()) {
-    if (node.OpType() == "SoftmaxCrossEntropyLoss") {
-      for (NodeArg* input : node.MutableInputDefs()) {
-        if (input->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT16
-            || input->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT) {
-          toFP32.insert(input);
-        }
-      }
-    } else if (node.OpType() == "SoftmaxCrossEntropyLossGrad") {
-      for (NodeArg* output : node.MutableOutputDefs()) {
-        if (output->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT16
-            || output->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT) {
-          toFP16.insert(output);
-        }
-      }
-    }
-  }
-
-  for (auto* tensor : toFP32) {
-    ORT_RETURN_IF_ERROR(CastNodeArg(graph, stage2_fp32_node_args, tensor, ONNX_NAMESPACE::TensorProto_DataType_FLOAT));
-  }
-
-  for (auto* tensor : toFP16) {
-    ORT_RETURN_IF_ERROR(CastNodeArg(graph, stage2_fp32_node_args, tensor, ONNX_NAMESPACE::TensorProto_DataType_FLOAT16));
-  }
-
   return Status::OK();
 }
 
@@ -317,8 +254,7 @@ Status TransformStage2(Graph& graph) {
 
       for (NodeArg* output : node.MutableOutputDefs()) {
         // TODO: This currently assumes that all outputs of FP32 ops are FP32.
-        if (FP32_Output_Nodes.find(node.Name()) == FP32_Output_Nodes.cend()
-            && output->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT16)
+        if (output->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT16)
           toFP16.insert(output);
       }
     }
@@ -443,10 +379,6 @@ Status TransformGraphForMixedPrecision(Graph& graph,
   // Stag 1: Convert whole graph including forward and backward to FP16
   // Insert Cast node to convert inputs from FP32 to FP16
   for (const NodeArg* input : graph.GetInputs()) {
-    if (input->Name() == "loss_scale") {
-      continue;
-    }
-
     if (input->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT) {
       ORT_RETURN_IF_ERROR(
           CastNodeArg(graph, stage1_fp32_node_args, graph.GetNodeArg(input->Name()), ONNX_NAMESPACE::TensorProto_DataType_FLOAT16));
@@ -459,10 +391,6 @@ Status TransformGraphForMixedPrecision(Graph& graph,
   std::vector<std::pair<std::string, const ONNX_NAMESPACE::TensorProto*>> fp16_initializers;
   for (const auto& kv : initialized_tensors) {
     NodeArg* input = graph.GetNodeArg(kv.first);
-    if (FP32_Output_Nodes.find(input->Name()) != FP32_Output_Nodes.cend()) {
-      continue;
-    }
-
     if (input->TypeAsProto()->tensor_type().elem_type() == ONNX_NAMESPACE::TensorProto_DataType_FLOAT) {
       if (use_fp16_initializer) {
         NodeArg* fp16_weight_arg = CreateFP16NodeArgAndUpdateConsumers(graph, stage1_fp32_node_args, input);
@@ -492,8 +420,6 @@ Status TransformGraphForMixedPrecision(Graph& graph,
 
   // Handle function body
   ORT_RETURN_IF_ERROR(HandleFunctionCalls(graph));
-
-  TransformStage1Point5(graph);
 
   // At this point, the model has been transformed to a valid FP16 model.
 

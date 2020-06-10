@@ -20,6 +20,7 @@ void ComputeBroadcastBackwardAxes(
     std::vector<int64_t>* A_axes,
     std::vector<int64_t>* B_axes);
 
+bool HasConcreteShape(const ArgDef& arg_def);
 std::vector<Dimension> GetShape(const ArgDef& arg_def);
 
 typedef std::vector<NodeDef> GradientDef;

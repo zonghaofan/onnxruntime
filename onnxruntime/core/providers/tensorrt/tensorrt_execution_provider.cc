@@ -841,7 +841,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
           if (input->isShapeTensor()) {
             // Get shape values for shape tensor input
             auto tensor_type = ort.GetTensorElementType(tensor_info);
-            int shape_size = nb_dims == 0 ? 1 : tensor_shapes[0];  // Shape tensor will be only 0D and 1D tensor 
+            int shape_size = nb_dims == 0 ? 1 : tensor_shapes[0];  // Shape tensor will be only 0D and 1D tensor
             if (tensor_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32) {
               int32_t* input = new int32_t[shape_size];
               cudaMemcpy(input, ort.GetTensorData<int32_t>(input_tensor), shape_size * sizeof(int32_t), cudaMemcpyDeviceToHost);
@@ -869,7 +869,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
                 shapes_min[j] = shape_range[j].first;
                 shapes_opt[j] = shape_range[j].second;
                 shapes_max[j] = shape_range[j].second;
-                
+
                 const auto& tensor_shape_value = tensor_shape_values[input_name][j];
                 // Update minimum dimension
                 if (tensor_shape_value < shape_range[j].first) {
@@ -1008,7 +1008,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
         // Set dynamic shapes
         nvinfer1::Dims dimensions = trt_engine->getBindingDimensions(static_cast<int>(binding_index));  ///or trt_context???
         int nb_dims = dimensions.nbDims;
-        if (dimension_update.find(input_name) != dimension_update.end())  
+        if (dimension_update.find(input_name) != dimension_update.end())
         {
           if (trt_engine->isShapeBinding(binding_index)) {
             trt_context->setInputShapeBinding(binding_index, &tensor_shape_values[input_name][0]);
@@ -1078,7 +1078,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
 
       // Set output shapes and assign output buffers
       std::vector<int> output_dim_sizes(num_outputs, 1);
-      std::vector<OrtValue*> output_tensor(num_outputs, nullptr);      
+      std::vector<OrtValue*> output_tensor(num_outputs, nullptr);
       for (int i = 0, end = output_binding_names.size(); i < end; ++i) {
         // Set dynamic shapes
         const std::string& output_name = output_binding_names[i];
@@ -1178,6 +1178,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
           auto output_tensor_ptr = ort.GetTensorMutableData<int64_t>(output_tensor[i]);
           if (output_tensor_ptr != nullptr) {
             cuda::Impl_Cast<int32_t, int64_t>(reinterpret_cast<int32_t*>(buffers[binding_index]), output_tensor_ptr, output_dim_sizes[i]);
+            cudaFree(buffers[binding_index]);
           }
         }
       }

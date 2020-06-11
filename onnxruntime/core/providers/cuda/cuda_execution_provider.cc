@@ -56,17 +56,19 @@ ONNX_OPERATOR_KERNEL_EX(
 
 }  // namespace cuda
 
-CUDAExecutionProvider::PerThreadContext::PerThreadContext(OrtDevice::DeviceId device_id, size_t cuda_mem_limit, ArenaExtendStrategy arena_extend_strategy) {
+CUDAExecutionProvider::PerThreadContext::PerThreadContext(OrtDevice::DeviceId device_id,
+                                                          size_t /*cuda_mem_limit*/,
+                                                          ArenaExtendStrategy /*arena_extend_strategy*/) {
   CUDA_CALL_THROW(cudaSetDevice(device_id));
   CUBLAS_CALL_THROW(cublasCreate(&cublas_handle_));
   CUDNN_CALL_THROW(cudnnCreate(&cudnn_handle_));
   CURAND_CALL_THROW(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
 
-  DeviceAllocatorRegistrationInfo default_memory_info(
-      {OrtMemTypeDefault,
-       [](OrtDevice::DeviceId id) { return onnxruntime::make_unique<CUDAAllocator>(id, CUDA); }, cuda_mem_limit, arena_extend_strategy});
+  //DeviceAllocatorRegistrationInfo default_memory_info(
+  //    {OrtMemTypeDefault,
+  //     [](OrtDevice::DeviceId id) { return onnxruntime::make_unique<CUDAAllocator>(id, CUDA); }, cuda_mem_limit, arena_extend_strategy});
 
-  allocator_ = CreateAllocator(default_memory_info, device_id);
+  // allocator_ = CreateAllocator(default_memory_info, device_id);
 }
 
 CUDAExecutionProvider::PerThreadContext::~PerThreadContext() {
@@ -226,9 +228,10 @@ AllocatorPtr CUDAExecutionProvider::GetAllocator(int id, OrtMemType mem_type) co
   // Pinned memory allocator is shared between threads, but CUDA memory allocator is per-thread or it may cause result changes
   // A hypothesis is that arena allocator is not aligned with CUDA output cache, and data from different kernel writes may
   // cause cacheline to contain dirty data.
-  if (mem_type == OrtMemTypeDefault) {
+  /*if (mem_type == OrtMemTypeDefault) {
     return GetPerThreadContext().GetAllocator();
-  } else {
+  } else */
+  {
     return IExecutionProvider::GetAllocator(id, mem_type);
   }
 }

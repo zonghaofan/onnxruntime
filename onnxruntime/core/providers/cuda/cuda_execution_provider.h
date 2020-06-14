@@ -68,7 +68,7 @@ class CUDAExecutionProvider : public IExecutionProvider {
     if (count_or_bytes == 0)
       return nullptr;
 
-    return IAllocator::MakeUniquePtr<T>(GetAllocator(device_id_, OrtMemTypeDefault), count_or_bytes);
+    return IAllocator::MakeUniquePtr<T>(GetPerThreadContext().GetAllocator(), count_or_bytes);
   }
 
   virtual std::shared_ptr<KernelRegistry> GetKernelRegistry() const override;
@@ -137,9 +137,9 @@ class CUDAExecutionProvider : public IExecutionProvider {
       }
     }
 
-    //AllocatorPtr GetAllocator() const {
-    //  return allocator_;
-    //}
+    AllocatorPtr GetAllocator() const {
+      return allocator_;
+    }
 
    private:
     cublasHandle_t cublas_handle_ = nullptr;
@@ -155,7 +155,7 @@ class CUDAExecutionProvider : public IExecutionProvider {
     std::unique_ptr<cuda::IConstantBuffer<double>> constant_ones_double_;
     std::unique_ptr<cuda::IConstantBuffer<half>> constant_ones_half_;
 
-    // AllocatorPtr allocator_;
+    AllocatorPtr allocator_;
   };
 
   using PerThreadContextMap = std::unordered_map<const CUDAExecutionProvider*, std::weak_ptr<PerThreadContext>>;

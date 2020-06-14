@@ -57,18 +57,21 @@ ONNX_OPERATOR_KERNEL_EX(
 }  // namespace cuda
 
 CUDAExecutionProvider::PerThreadContext::PerThreadContext(OrtDevice::DeviceId device_id,
-                                                          size_t /*cuda_mem_limit*/,
-                                                          ArenaExtendStrategy /*arena_extend_strategy*/) {
+                                                          size_t cuda_mem_limit,
+                                                          ArenaExtendStrategy arena_extend_strategy) {
   CUDA_CALL_THROW(cudaSetDevice(device_id));
   CUBLAS_CALL_THROW(cublasCreate(&cublas_handle_));
   CUDNN_CALL_THROW(cudnnCreate(&cudnn_handle_));
   CURAND_CALL_THROW(curandCreateGenerator(&curand_generator_, CURAND_RNG_PSEUDO_DEFAULT));
 
-  //DeviceAllocatorRegistrationInfo default_memory_info(
-  //    {OrtMemTypeDefault,
-  //     [](OrtDevice::DeviceId id) { return onnxruntime::make_unique<CUDAAllocator>(id, CUDA); }, cuda_mem_limit, arena_extend_strategy});
+  DeviceAllocatorRegistrationInfo default_memory_info(
+      {OrtMemTypeDefault,
+       [](OrtDevice::DeviceId id) {
+         return onnxruntime::make_unique<CUDAAllocator>(id, CUDA);
+       },
+       cuda_mem_limit, arena_extend_strategy});
 
-  // allocator_ = CreateAllocator(default_memory_info, device_id);
+  allocator_ = CreateAllocator(default_memory_info, device_id);
 }
 
 CUDAExecutionProvider::PerThreadContext::~PerThreadContext() {

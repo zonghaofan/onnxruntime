@@ -18,6 +18,7 @@ void SetProviderHost(ProviderHost& host) {
   g_host = &host;
 }
 
+#if 0
 static std::unique_ptr<std::vector<std::function<void()>>> s_run_on_unload_;
 
 void RunOnUnload(std::function<void()> function) {
@@ -41,6 +42,7 @@ struct OnUnload {
   }
 
 } g_on_unload;
+#endif
 
 }  // namespace onnxruntime
 

@@ -31,6 +31,8 @@ class TrainingRunner {
     PathString train_data_dir;
     PathString test_data_dir;
     PathString output_dir;  // Output of training, e.g., trained model files.
+    PathString perf_output_dir; // training perf metrics
+    std::string model_type; // bert/gpt2/...
 
     LossFunctionInfo loss_func_info;
 
@@ -154,8 +156,11 @@ class TrainingRunner {
     // pipeline_parallel_size > 1 means pipeline is enabled.
     // pipeline_parallel_size == 1 means pipeline is disabled.
     int pipeline_parallel_size = 1;
+    // pipeline partition information to do online-partition. If the graph is
+    // pre-partitioned, no need to fill this value.
+    std::vector<TrainingSession::TrainingConfiguration::CutInfo> pipeline_partition_cut_list;
     // model_paths[i] is the name of the pipeline stage for i-th process.
-    // The i-th file is run by the i-th MPI rank. 
+    // The i-th file is run by the i-th MPI rank.
     // If model_paths is not empty, model partition transformation may not be internally invoked.
     VectorString pipeline_stage_paths;
     // Enable gradient clipping.
@@ -167,7 +172,8 @@ class TrainingRunner {
 
   common::Status Initialize();
 
-  common::Status Run(IDataLoader* training_data_loader, IDataLoader* test_data_loader);
+  common::Status Run(IDataLoader* training_data_loader, IDataLoader* test_data_loader,
+    const MapStringToString& mapped_dimensions = {});
 
   common::Status EndTraining(IDataLoader* data_loader);
 
@@ -190,21 +196,28 @@ class TrainingRunner {
   Status PrepareFetchNamesAndFetches(const SessionMode mode,
                                      std::vector<std::string>& fetch_names,
                                      std::vector<MLValue>& fetches);
-  Status RunWithUpdate(VectorString& feed_names,
-                       VectorString& fetch_names,
-                       std::vector<MLValue>& feeds,
-                       std::vector<MLValue>& fetches); 
-  Status RunWithoutUpdate(VectorString& feed_names,
-                          VectorString& fetch_names,
-                          std::vector<MLValue>& feeds,
-                          size_t& gradient_accumulation_step_count); 
-  Status TrainingLoop(IDataLoader& training_data_loader, IDataLoader* test_data_loader);
+  void RunWithUpdate(VectorString& feed_names,
+                     VectorString& fetch_names,
+                     std::vector<MLValue>& feeds,
+                     std::vector<MLValue>& fetches);
+  void RunWithoutUpdate(VectorString& feed_names,
+                        VectorString& fetch_names,
+                        std::vector<MLValue>& feeds,
+                        size_t& gradient_accumulation_step_count);
+  Status TrainingLoop(IDataLoader& training_data_loader, IDataLoader* test_data_loader,
+    const MapStringToString& mapped_dimensions);
   Status Evaluate(InferenceSession& session, IDataLoader& data_loader);
 
   Status SaveCheckpoint(const PathString& checkpoint_path);
   Status LoadCheckpoint(const PathString& checkpoint_path);
   Status SaveCheckpointProperties(std::unordered_map<std::string, std::string>& properties) const;
   Status LoadCheckpointProperties(const std::unordered_map<std::string, std::string>& properties);
+
+  Status SavePerfMetrics(const size_t number_of_batches, const size_t gradient_accumulation_steps,
+                         const size_t weight_update_steps, const double total_time,
+                         const double avg_time_per_batch, const double throughput, const double stabilized_throughput,
+                         const double e2e_throughput, const MapStringToString& mapped_dimensions,
+                         const short average_cpu_usage, const size_t peak_workingset_size);
 
   size_t step_;
   size_t round_;
@@ -220,7 +233,7 @@ class TrainingRunner {
   AllocatorPtr input_allocator_;
 
   std::unique_ptr<CheckpointRegistry> checkpoint_registry_;
-  
+
   // Pipeline fields are valid only if params_.pipeline_parallel_size > 1.
   // Information for running pipeline.
   pipeline::PipelineContext pipeline_context_;

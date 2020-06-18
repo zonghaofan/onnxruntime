@@ -129,10 +129,6 @@ TEST(DropoutTest, EmptyRatio) {
   RunDropoutTest("Dropout", true, {1000});
 }
 
-TEST(DropoutTest, Float16Ratio) {
-  RunDropoutTest("Dropout", true, {1000}, 0.0f, true, true);
-}
-
 TEST(TrainableDropoutTest, Basic) {
   RunDropoutTest("TrainableDropout", false, {10, 10, 10}, 0.75);
 }
@@ -147,10 +143,6 @@ TEST(TrainableDropoutTest, RatioLimit) {
 
 TEST(TrainableDropoutTest, EmptyRatio) {
   RunDropoutTest("TrainableDropout", true, {1000}, -1);
-}
-
-TEST(TrainableDropoutTest, Float16Ratio) {
-  RunDropoutTest("TrainableDropout", true, {1000}, 0.0f, true, true);
 }
 
 namespace {
@@ -184,6 +176,12 @@ void RunDropoutGradTest(const char* op, float ratio, const std::vector<int64_t>&
   test.AddInput<bool>("mask", input_shape.GetDims(), mask_buffer.get(), input_shape.Size());
   if (!default_ratio) {
     test.AddInput<float>("ratio", {1}, ratio_data);
+  } else {
+    test.AddMissingOptionalInput<float>();
+  }
+
+  if (strcmp(op, "TrainableDropoutGrad") != 0) {
+    test.AddInput<bool>("training_mode", {}, {true});
   }
 
   test.AddOutput<float>("dx", input_shape.GetDims(), dx_data);

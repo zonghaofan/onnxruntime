@@ -84,7 +84,7 @@ else
     else #cpu, ngraph and openvino
         export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
         python3 $SCRIPT_DIR/../../build.py --build_dir /build \
-            --config Debug Release $COMMON_BUILD_ARGS $BUILD_EXTR_PAR
+            --config Debug RelWithDebInfo $COMMON_BUILD_ARGS $BUILD_EXTR_PAR
     fi
 fi
 

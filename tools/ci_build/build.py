@@ -837,7 +837,8 @@ def build_targets(args, cmake_path, build_dir, configs, parallel):
                 # CMake will generate correct build tool args for Xcode
                 cmd_args += ["--parallel", num_cores]
             else:
-                build_tool_args += ["-j" + num_cores]
+                #build_tool_args += ["-j" + num_cores]
+                build_tool_args += ["-j6"]
 
         if build_tool_args:
             cmd_args += ["--"]

@@ -648,8 +648,15 @@ def generate_build_tree(cmake_path, source_dir, build_dir, cuda_home, cudnn_home
             "ON" if args.build_micro_benchmarks else "OFF")
     ]
 
-    if mpi_home and os.path.exists(mpi_home):
-        cmake_args += ["-Donnxruntime_MPI_HOME=" + mpi_home]
+    if mpi_home:
+        if os.path.exists(mpi_home):
+            mpi_home_probe = os.path.join(mpi_home, "include")
+            if os.path.exists(mpi_home_probe):
+                cmake_args += ["-Donnxruntime_MPI_HOME=" + mpi_home]
+            else:
+                raise BuildError("Expected to find " + mpi_home_probe + " for MPI")
+        else:
+            raise BuildError("Expected to find MPI home at " + mpi_home)
 
     if nccl_home and os.path.exists(nccl_home):
         cmake_args += ["-Donnxruntime_NCCL_HOME=" + nccl_home]

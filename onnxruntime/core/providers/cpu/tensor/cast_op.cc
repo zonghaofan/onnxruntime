@@ -220,9 +220,8 @@ const std::vector<MLDataType> castOpTypeConstraints{
     DataTypeImpl::GetTensorType<std::string>()};
 
 #define ADD_FROM_CAST_OP(in_type)                                                                                                  \
-  ONNX_CPU_OPERATOR_VERSIONED_TYPED_KERNEL(                                                                                        \
+  ONNX_CPU_OPERATOR_TYPED_KERNEL(                                                                                                  \
       Cast,                                                                                                                        \
-      6,                                                                                                                           \
       9,                                                                                                                           \
       in_type,                                                                                                                     \
       KernelDefBuilder().TypeConstraint("T1", DataTypeImpl::GetTensorType<in_type>()).TypeConstraint("T2", castOpTypeConstraints), \
@@ -299,9 +298,8 @@ ADD_FROM_CAST_OP(bool);
 ADD_FROM_CAST_OP(float);
 ADD_FROM_CAST_OP(double);
 
-ONNX_CPU_OPERATOR_VERSIONED_TYPED_KERNEL(
+ONNX_CPU_OPERATOR_TYPED_KERNEL(
     Cast,
-    6,
     9,
     MLFloat16,
     KernelDefBuilder().TypeConstraint("T1", DataTypeImpl::GetTensorType<MLFloat16>()).TypeConstraint("T2", castOpTypeConstraints),

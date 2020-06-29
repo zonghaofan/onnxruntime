@@ -90,7 +90,8 @@ Status KernelRegistryManager::SearchKernelRegistry(const onnxruntime::Node& node
                                                    /*out*/ const KernelCreateInfo** kernel_create_info) const {
   const std::string& ptype = node.GetExecutionProviderType();
   if (ptype.empty()) {
-    return Status(ONNXRUNTIME, FAIL, "The node is not placed on any Execution Provider");
+    return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "The node (name='", node.Name(), "' optype=", node.OpType(),
+                           ") is not placed on any Execution Provider");
   }
   Status status;
   {

@@ -949,6 +949,8 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
         if (trt_state->engine->get() == nullptr) {
           return ORT_MAKE_STATUS(ONNXRUNTIME, EP_FAIL, "TensorRT EP Failed to Build Engine.");
         }
+		trt_engine = trt_state->engine->get();
+		
         *(trt_state->context) = tensorrt_ptr::unique_pointer<nvinfer1::IExecutionContext>(
                                   trt_state->engine->get()->createExecutionContext());
         if (trt_state->context->get() == nullptr) {

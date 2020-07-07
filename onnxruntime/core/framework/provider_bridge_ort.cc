@@ -21,6 +21,16 @@
 
 namespace onnxruntime {
 
+struct ProviderLibrary {
+  ProviderLibrary(const char* filename);
+  ~ProviderLibrary() {
+    Env::Default().UnloadDynamicLibrary(handle_);
+  }
+
+  Provider* provider_{};
+  void* handle_{};
+};
+
 struct Provider_OrtDevice_Impl : Provider_OrtDevice {
   OrtDevice v_;
 };
@@ -430,6 +440,7 @@ struct Provider_IExecutionProvider_Router_Impl : Provider_IExecutionProvider_Rou
     IExecutionProvider::InsertAllocator(static_cast<Provider_IAllocator_Impl*>(allocator.get())->p_);
   }
 
+  std::shared_ptr<ProviderLibrary> library_;
   std::unique_ptr<Provider_IExecutionProvider> outer_;
 };
 
@@ -503,72 +514,68 @@ struct ProviderHostImpl : ProviderHost {
 
 } provider_host_;
 
-struct ProviderLibrary {
-  ProviderLibrary(const char* filename) {
-    std::string full_path = Env::Default().GetRuntimePath() + std::string(filename);
-    Env::Default().LoadDynamicLibrary(full_path, &handle_);
-    if (!handle_)
-      return;
+ProviderLibrary::ProviderLibrary(const char* filename) {
+  std::string full_path = Env::Default().GetRuntimePath() + std::string(filename);
+  Env::Default().LoadDynamicLibrary(full_path, &handle_);
+  if (!handle_)
+    return;
 
 #if defined(_WIN32) && !defined(_OPENMP)
-    {
-      // We crash when unloading DNNL on Windows when OpenMP also unloads (As there are threads
-      // still running code inside the openmp runtime DLL if OMP_WAIT_POLICY is set to ACTIVE).
-      // To avoid this, we pin the OpenMP DLL so that it unloads as late as possible.
-      HMODULE handle{};
+  {
+    // We crash when unloading DNNL on Windows when OpenMP also unloads (As there are threads
+    // still running code inside the openmp runtime DLL if OMP_WAIT_POLICY is set to ACTIVE).
+    // To avoid this, we pin the OpenMP DLL so that it unloads as late as possible.
+    HMODULE handle{};
 #ifdef _DEBUG
-      constexpr const char* dll_name = "vcomp140d.dll";
+    constexpr const char* dll_name = "vcomp140d.dll";
 #else
-      constexpr const char* dll_name = "vcomp140.dll";
+    constexpr const char* dll_name = "vcomp140.dll";
 #endif
-      ::GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_PIN, dll_name, &handle);
-      assert(handle);  // It should exist
-    }
+    ::GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_PIN, dll_name, &handle);
+    assert(handle);  // It should exist
+  }
 #endif
 
-    Provider* (*PGetProvider)();
-    Env::Default().GetSymbolFromLibrary(handle_, "GetProvider", (void**)&PGetProvider);
+  Provider* (*PGetProvider)();
+  Env::Default().GetSymbolFromLibrary(handle_, "GetProvider", (void**)&PGetProvider);
 
-    provider_ = PGetProvider();
-    provider_->SetProviderHost(provider_host_);
-  }
-
-  ~ProviderLibrary() {
-    Env::Default().UnloadDynamicLibrary(handle_);
-  }
-
-  Provider* provider_{};
-  void* handle_{};
-};
+  provider_ = PGetProvider();
+  provider_->SetProviderHost(provider_host_);
+}
 
 // This class translates the IExecutionProviderFactory interface to work with the interface providers implement
 struct IExecutionProviderFactory_Translator : IExecutionProviderFactory {
-  IExecutionProviderFactory_Translator(std::shared_ptr<Provider_IExecutionProviderFactory> p) : p_{p} {}
+  IExecutionProviderFactory_Translator(std::shared_ptr<ProviderLibrary> library, std::shared_ptr<Provider_IExecutionProviderFactory> p) : library_{library}, p_{p} {}
+  ~IExecutionProviderFactory_Translator() override {
+  }
 
   std::unique_ptr<IExecutionProvider> CreateProvider() override {
     auto provider = p_->CreateProvider();
-    return std::unique_ptr<IExecutionProvider>(static_cast<Provider_IExecutionProvider_Router_Impl*>(provider.release()->p_));
+    auto execution_provider = std::unique_ptr<Provider_IExecutionProvider_Router_Impl>(static_cast<Provider_IExecutionProvider_Router_Impl*>(provider.release()->p_));
+    execution_provider->library_ = library_;
+    return execution_provider;
   }
 
+  std::shared_ptr<ProviderLibrary> library_;
   std::shared_ptr<Provider_IExecutionProviderFactory> p_;
 };
 
 std::shared_ptr<IExecutionProviderFactory> CreateExecutionProviderFactory_Dnnl(int device_id) {
 #ifdef _WIN32
-  static ProviderLibrary library("onnxruntime_providers_dnnl.dll");
+  auto library = std::make_shared<ProviderLibrary>("onnxruntime_providers_dnnl.dll");
 #elif defined(__APPLE__)
-  static ProviderLibrary library("libonnxruntime_providers_dnnl.dylib");
+  auto library = std::make_shared<ProviderLibrary>("libonnxruntime_providers_dnnl.dylib");
 #else
-  static ProviderLibrary library("libonnxruntime_providers_dnnl.so");
+  auto library = std::make_shared<ProviderLibrary>("libonnxruntime_providers_dnnl.so");
 #endif
-  if (!library.provider_) {
+  if (!library->provider_) {
     LOGS_DEFAULT(ERROR) << "Failed to load provider shared library";
     return nullptr;
   }
 
   //return std::make_shared<onnxruntime::MkldnnProviderFactory>(device_id);
   //TODO: This is apparently a bug. The constructor parameter is create-arena-flag, not the device-id
-  return std::make_shared<IExecutionProviderFactory_Translator>(library.provider_->CreateExecutionProviderFactory(device_id));
+  return std::make_shared<IExecutionProviderFactory_Translator>(library, library->provider_->CreateExecutionProviderFactory(device_id));
 }
 
 }  // namespace onnxruntime

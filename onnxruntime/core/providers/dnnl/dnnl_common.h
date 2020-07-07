@@ -46,6 +46,7 @@ class PrimitivePool {
   ~PrimitivePool() = default;
 
   void SetPrimitive(const std::string& key, std::unique_ptr<PrimitiveBase> primitive) {
+    std::lock_guard<std::mutex> guard{mutex};
     auto& map = PrimitivePool<T>::GetMap();
     auto iter = map.find(key);
     // We should not find a primitive already using this key.
@@ -54,6 +55,7 @@ class PrimitivePool {
   }
 
   PrimitiveBase* GetPrimitive(const std::string& key) {
+    std::lock_guard<std::mutex> guard{mutex};
     const auto& map = PrimitivePool<T>::GetMap();
     auto iter = map.find(key);
     if (iter != map.end()) {
@@ -67,9 +69,11 @@ class PrimitivePool {
   // For thread safety, the map needs to be kept in thread local storage.
   static inline std::unordered_map<std::string, std::unique_ptr<PrimitiveBase>>& GetMap() {
     using MapType = std::unordered_map<std::string, std::unique_ptr<PrimitiveBase>>;
-    static thread_local DeleteOnUnloadPtr<MapType> map(new MapType());
+    static DeleteOnUnloadPtr<MapType> map(new MapType());
     return *map;
   }
+
+  std::mutex mutex;
 };
 
 }  // namespace ort_dnnl

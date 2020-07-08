@@ -81,6 +81,8 @@ class Env {
   };
   using EnvThread = onnxruntime::EnvThread;
   virtual ~Env() = default;
+
+  void Shutdown();
   // clang-format off
   /**
    * Start a new thread for a thread pool

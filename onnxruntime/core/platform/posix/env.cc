@@ -482,6 +482,7 @@ class PosixEnv : public Env {
 
  private:
   PosixEnv() = default;
+  ~PosixEnv() { Shutdown(); }
   Telemetry telemetry_provider_;
 };
 

@@ -438,7 +438,6 @@ struct Provider_IExecutionProvider_Router_Impl : Provider_IExecutionProvider_Rou
     IExecutionProvider::InsertAllocator(static_cast<Provider_IAllocator_Impl*>(allocator.get())->p_);
   }
 
-  std::shared_ptr<ProviderLibrary> library_;
   std::unique_ptr<Provider_IExecutionProvider> outer_;
 };
 
@@ -544,37 +543,47 @@ ProviderLibrary::ProviderLibrary(const char* filename) {
 
 // This class translates the IExecutionProviderFactory interface to work with the interface providers implement
 struct IExecutionProviderFactory_Translator : IExecutionProviderFactory {
-  IExecutionProviderFactory_Translator(std::shared_ptr<ProviderLibrary> library, std::shared_ptr<Provider_IExecutionProviderFactory> p) : library_{library}, p_{p} {}
+  IExecutionProviderFactory_Translator(std::shared_ptr<Provider_IExecutionProviderFactory> p) : p_{p} {}
   ~IExecutionProviderFactory_Translator() override {
   }
 
   std::unique_ptr<IExecutionProvider> CreateProvider() override {
     auto provider = p_->CreateProvider();
-    auto execution_provider = std::unique_ptr<Provider_IExecutionProvider_Router_Impl>(static_cast<Provider_IExecutionProvider_Router_Impl*>(provider.release()->p_));
-    execution_provider->library_ = library_;
-    return execution_provider;
+    return std::unique_ptr<Provider_IExecutionProvider_Router_Impl>(static_cast<Provider_IExecutionProvider_Router_Impl*>(provider.release()->p_));
   }
 
-  std::shared_ptr<ProviderLibrary> library_;
   std::shared_ptr<Provider_IExecutionProviderFactory> p_;
 };
 
+std::shared_ptr<ProviderLibrary> g_provider_library;
+
+extern void (*pCleanup_ProviderFactories)();
+
+void Cleanup_ProviderFactories() {
+  g_provider_library = nullptr;
+}
+
 std::shared_ptr<IExecutionProviderFactory> CreateExecutionProviderFactory_Dnnl(int device_id) {
+  if (!g_provider_library) {
 #ifdef _WIN32
-  auto library = std::make_shared<ProviderLibrary>("onnxruntime_providers_dnnl.dll");
+    auto library = std::make_shared<ProviderLibrary>("onnxruntime_providers_dnnl.dll");
 #elif defined(__APPLE__)
-  auto library = std::make_shared<ProviderLibrary>("libonnxruntime_providers_dnnl.dylib");
+    auto library = std::make_shared<ProviderLibrary>("libonnxruntime_providers_dnnl.dylib");
 #else
-  auto library = std::make_shared<ProviderLibrary>("libonnxruntime_providers_dnnl.so");
+    auto library = std::make_shared<ProviderLibrary>("libonnxruntime_providers_dnnl.so");
 #endif
-  if (!library->provider_) {
+    g_provider_library = library;
+    pCleanup_ProviderFactories = &Cleanup_ProviderFactories;
+  }
+
+  if (!g_provider_library->provider_) {
     LOGS_DEFAULT(ERROR) << "Failed to load provider shared library";
     return nullptr;
   }
 
   //return std::make_shared<onnxruntime::MkldnnProviderFactory>(device_id);
   //TODO: This is apparently a bug. The constructor parameter is create-arena-flag, not the device-id
-  return std::make_shared<IExecutionProviderFactory_Translator>(library, library->provider_->CreateExecutionProviderFactory(device_id));
+  return std::make_shared<IExecutionProviderFactory_Translator>(g_provider_library->provider_->CreateExecutionProviderFactory(device_id));
 }
 
 }  // namespace onnxruntime

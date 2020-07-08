@@ -19,7 +19,14 @@ limitations under the License.
 
 namespace onnxruntime {
 
+void (*pCleanup_ProviderFactories)(){};
+
 Env::Env() = default;
+
+void Env::Shutdown() {
+  if (pCleanup_ProviderFactories)
+    pCleanup_ProviderFactories();
+}
 
 }  // namespace onnxruntime
 
@@ -33,4 +40,4 @@ gsl_api void fail_fast_assert_handler(
     char const* const file, int line) {
   ORT_ENFORCE(false, expression, file, line, message);
 }
-} // namespace gsl
+}  // namespace gsl

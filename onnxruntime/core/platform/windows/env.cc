@@ -541,6 +541,8 @@ class WindowsEnv : public Env {
     }
   }
 
+  ~WindowsEnv() { Shutdown(); }
+
   typedef VOID(WINAPI* FnGetSystemTimePreciseAsFileTime)(LPFILETIME);
   FnGetSystemTimePreciseAsFileTime GetSystemTimePreciseAsFileTime_;
   WindowsTelemetry telemetry_provider_;

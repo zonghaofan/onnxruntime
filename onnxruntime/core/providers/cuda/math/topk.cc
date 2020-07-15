@@ -66,8 +66,8 @@ Status TopK<inputk>::ComputeInternal(OpKernelContext* ctx) const {
 
   auto output_shape = tensor_X->Shape();
   output_shape[axis] = K_;
-  auto tensor_V = ctx->Output(0, output_shape);
-  auto tensor_I = ctx->Output(1, output_shape);
+  auto __attribute__((unused)) tensor_V = ctx->Output(0, output_shape);
+  auto __attribute__((unused)) tensor_I = ctx->Output(1, output_shape);
 
   if (0 == K_) {
     return Status::OK();
@@ -79,7 +79,7 @@ Status TopK<inputk>::ComputeInternal(OpKernelContext* ctx) const {
     elem_nums[i] *= elem_nums[i + 1];
   }
 
-  auto N = elem_nums[0] / dimension;
+  auto __attribute__((unused)) N = elem_nums[0] / dimension;
   TArray<int64_t> elem_nums_cuda(elem_nums);
 
   auto prim_type = tensor_X->DataType()->AsPrimitiveDataType();
@@ -87,17 +87,17 @@ Status TopK<inputk>::ComputeInternal(OpKernelContext* ctx) const {
     return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Type not supported for TopK operator");
   }
 
-  if (IS_PRIM_TYPE(uint8_t)) return TOPKIMPL(uint8_t);
-  if (IS_PRIM_TYPE(uint16_t)) return TOPKIMPL(uint16_t);
-  if (IS_PRIM_TYPE(uint32_t)) return TOPKIMPL(uint32_t);
-  if (IS_PRIM_TYPE(uint64_t)) return TOPKIMPL(uint64_t);
-  if (IS_PRIM_TYPE(int8_t)) return TOPKIMPL(int8_t);
-  if (IS_PRIM_TYPE(int16_t)) return TOPKIMPL(int16_t);
-  if (IS_PRIM_TYPE(int32_t)) return TOPKIMPL(int32_t);
-  if (IS_PRIM_TYPE(int64_t)) return TOPKIMPL(int64_t);
-  if (IS_PRIM_TYPE(float)) return TOPKIMPL(float);
-  if (IS_PRIM_TYPE(double)) return TOPKIMPL(double);
-  if (IS_PRIM_TYPE(uint8_t)) return TOPKIMPL(uint8_t);
+  // if (IS_PRIM_TYPE(uint8_t)) return TOPKIMPL(uint8_t);
+  // if (IS_PRIM_TYPE(uint16_t)) return TOPKIMPL(uint16_t);
+  // if (IS_PRIM_TYPE(uint32_t)) return TOPKIMPL(uint32_t);
+  // if (IS_PRIM_TYPE(uint64_t)) return TOPKIMPL(uint64_t);
+  // if (IS_PRIM_TYPE(int8_t)) return TOPKIMPL(int8_t);
+  // if (IS_PRIM_TYPE(int16_t)) return TOPKIMPL(int16_t);
+  // if (IS_PRIM_TYPE(int32_t)) return TOPKIMPL(int32_t);
+  // if (IS_PRIM_TYPE(int64_t)) return TOPKIMPL(int64_t);
+  // if (IS_PRIM_TYPE(float)) return TOPKIMPL(float);
+  // if (IS_PRIM_TYPE(double)) return TOPKIMPL(double);
+  // if (IS_PRIM_TYPE(uint8_t)) return TOPKIMPL(uint8_t);
   return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Type not supported for TopK operator");
 }
 

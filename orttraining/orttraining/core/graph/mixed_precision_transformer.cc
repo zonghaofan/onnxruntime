@@ -33,7 +33,17 @@ namespace training {
 // continue to use 32-bit precision. Others will used reduced precision.
 // Loss Ops and loss grad Ops are now handled by LossSubgraph, so currently this set is empty.
 // If in the future there is new FP32 Op, we can add it here without changing code on other place.
-static const std::unordered_set<std::string> FP32_Nodes = {};
+static const std::unordered_set<std::string> FP32_Nodes = {
+  "Softmax",
+  "SoftmaxGrad",
+  "Gelu",
+  "GeluGrad",
+  "FastGelu",
+  "FastGeluGrad",
+  "BiasGelu",
+  "BiasGeluGrad_dX",
+  "BiasFastGeluGrad_dX"
+};
 
 bool IsFP32Node(const Node* node) {
   return FP32_Nodes.find(node->OpType()) != FP32_Nodes.cend();
@@ -43,6 +53,15 @@ bool IsFP32Node(const Node* node) {
 static const std::unordered_map<std::string, std::vector<int>> stage1_fp32_node_args = {
     {"Dropout", {1}},
     {"DropoutGrad", {2}},
+    {"Softmax", {0}},
+    {"SoftmaxGrad", {0, 1}},
+    {"Gelu", {0}},
+    {"GeluGrad", {0, 1}},
+    {"FastGelu", {0}},
+    {"FastGeluGrad", {0, 1}},
+    {"BiasGelu", {0, 1}},
+    {"BiasGeluGrad_dX", {0, 1, 2}},
+    {"BiasFastGeluGrad_dX", {0, 1, 2}},
 };
 
 // Currently the list here is same as stage1 above due to empty FP32_Nodes.
@@ -50,6 +69,15 @@ static const std::unordered_map<std::string, std::vector<int>> stage1_fp32_node_
 static const std::unordered_map<std::string, std::vector<int>> stage2_fp32_node_args = {
     {"Dropout", {1}},
     {"DropoutGrad", {2}},
+    {"Softmax", {0}},
+    {"SoftmaxGrad", {0, 1}},
+    {"Gelu", {0}},
+    {"GeluGrad", {0, 1}},
+    {"FastGelu", {0}},
+    {"FastGeluGrad", {0, 1}},
+    {"BiasGelu", {0, 1}},
+    {"BiasGeluGrad_dX", {0, 1, 2}},
+    {"BiasFastGeluGrad_dX", {0, 1, 2}},
 };
 
 bool IsFP32(const std::unordered_map<std::string, std::vector<int>>& map, std::string opname, int argnum) {

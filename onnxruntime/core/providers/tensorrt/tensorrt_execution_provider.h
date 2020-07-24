@@ -17,6 +17,8 @@ static const std::string kMinSubgraphSize = "ORT_TENSORRT_MIN_SUBGRAPH_SIZE";
 static const std::string kMaxWorkspaceSize = "ORT_TENSORRT_MAX_WORKSPACE_SIZE";
 static const std::string kFP16Enable = "ORT_TENSORRT_FP16_ENABLE";
 static const std::string kDumpSubgraphs = "ORT_TENSORRT_DUMP_SUBGRAPHS";
+static const std::string kEngineCacheEnable = "ORT_TENSORRT_ENGINE_CACHE_ENABLE";
+static const std::string kEngineCachePath = "ORT_TENSORRT_ENGINE_CACHE_PATH";
 }  // namespace tensorrt_env_vars
 
 class TensorrtLogger : public nvinfer1::ILogger {
@@ -102,6 +104,9 @@ class TensorrtExecutionProvider : public IExecutionProvider {
   int min_subgraph_size_ = 1;
   bool fp16_enable_ = false;
   bool dump_subgraphs_ = false;
+  bool engine_cache_enable_ = false;
+  std::string engine_cache_path_;
+  nvinfer1::IRuntime* runtime_ = nullptr;
 
   OrtMutex tensorrt_mu_;
   int device_id_;

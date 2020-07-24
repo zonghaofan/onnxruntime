@@ -166,6 +166,11 @@ TensorrtExecutionProvider::TensorrtExecutionProvider(const TensorrtExecutionProv
     }
     runtime_ = nvinfer1::createInferRuntime(GetTensorrtLogger());
   }
+  
+  const std::string debug_enable_env = env_instance.GetEnvironmentVar(tensorrt_env_vars::kDebugEnable);
+  if (!debug_enable_env.empty()) {
+    debug_enable_ = (std::stoi(debug_enable_env) == 0 ? false : true);
+  }
 }
 
 TensorrtExecutionProvider::~TensorrtExecutionProvider() {}
@@ -467,6 +472,9 @@ SubGraphCollection_t TensorrtExecutionProvider::GetSupportedList(SubGraphCollect
         const auto explicitBatch = 1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
         auto trt_network = tensorrt_ptr::unique_pointer<nvinfer1::INetworkDefinition>(trt_builder->createNetworkV2(explicitBatch));
 
+        if (debug_enable_) {
+          std::cout << "TRT Debug: GetSupportedList iteration " << iterations << " -> supportsModel" << std::endl;
+        }
         auto trt_parser = tensorrt_ptr::unique_pointer<nvonnxparser::IParser>(nvonnxparser::createParser(*trt_network, trt_logger));
         trt_parser->supportsModel(string_buf.data(), string_buf.size(), parser_nodes_list);
 
@@ -597,12 +605,20 @@ void TensorrtExecutionProvider::RemoveTensorRTGraphCycles(SubGraphCollection_t& 
 
 std::vector<std::unique_ptr<ComputeCapability>>
 TensorrtExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
-                                         const std::vector<const KernelRegistry*>& /*kernel_registries*/) const {							 
+                                         const std::vector<const KernelRegistry*>& /*kernel_registries*/) const {
+  if (debug_enable_) {
+    std::cout << "TRT Debug: GetCapability..." << std::endl;
+  }
+  
   // Get supported node list from TensorRT parser
   std::vector<size_t> nodes_vector(graph.NumberOfNodes());
   std::iota(std::begin(nodes_vector), std::end(nodes_vector), 0);
   SubGraphCollection_t supported_nodes_vector, parser_nodes_vector = {{nodes_vector, false}};
 
+  if (debug_enable_) {
+    std::cout << "TRT Debug: GetSupportedList" << std::endl;
+  }
+  
   bool early_termination = false;
   supported_nodes_vector = GetSupportedList(parser_nodes_vector, 0, max_partition_iterations_, graph, &early_termination);
   if (early_termination) {
@@ -620,6 +636,10 @@ TensorrtExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
   // Detect and remove cycles from supported node list
   RemoveTensorRTGraphCycles(supported_nodes_vector, graph);
 
+  if (debug_enable_) {
+    std::cout << "TRT Debug: GetSubGraph" << std::endl;
+  }
+  
   // Construct subgraph capability from node list
   std::vector<std::unique_ptr<ComputeCapability>> result;
   int counter = 0, number_of_trt_nodes = 0;
@@ -637,12 +657,20 @@ TensorrtExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
   } else {
     LOGS_DEFAULT(INFO) << "Number of subgraphs running on TensorRT exeuction provider: " << number_of_subgraphs;
   }
+  
+  if (debug_enable_) {
+    std::cout << "TRT Debug: Number of TRT subgraphs: " << number_of_subgraphs << std::endl;
+  }
 
   return result;
 }
 
 common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime::Node*>& fused_nodes,
                                                   std::vector<NodeComputeInfo>& node_compute_funcs) {
+  if (debug_enable_) {
+    std::cout << "TRT Debug: Compile..." << std::endl;
+  }
+  
   for (const auto* fused_node : fused_nodes) {
     // Build map from input name to its index in input definitions
     std::unordered_map<std::string, int> input_map;
@@ -679,6 +707,10 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
       // Dump the TensorRT subgraph if enabled via ORT_TENSORRT_DUMP_SUBGRAPHS env variable.
       std::fstream dump(fused_node->Name() + ".onnx", std::ios::out | std::ios::trunc | std::ios::binary);
       model_proto.SerializeToOstream(&dump);
+    }
+	
+    if (debug_enable_) {
+      std::cout << "TRT Debug: Fused node: " << fused_node->Name() << std::endl;
     }
 
     // Create TensorRT engine
@@ -805,7 +837,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
       *p = {context->allocate_func, context->release_func, context->allocator_handle, parsers_[context->node_name].get(),
             &engines_[context->node_name], &contexts_[context->node_name], builders_[context->node_name].get(),
             networks_[context->node_name].get(), input_info_[context->node_name], output_info_[context->node_name],
-            input_shape_ranges_[context->node_name], &tensorrt_mu_, &fp16_enable_,
+            input_shape_ranges_[context->node_name], &tensorrt_mu_, &fp16_enable_, &debug_enable_, 
             &max_workspace_size_};
       *state = p.release();
       return 0;
@@ -818,10 +850,13 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
     };
 
     // Create compute function
-    compute_info.compute_func = [](FunctionState state, const OrtCustomOpApi* api, OrtKernelContext* context) {
+    compute_info.compute_func = [](FunctionState state, const OrtCustomOpApi* api, OrtKernelContext* context) {	  
       Ort::CustomOpApi ort{*api};
       TensorrtFuncState* trt_state = reinterpret_cast<TensorrtFuncState*>(state);
       std::lock_guard<OrtMutex> lock(*(trt_state->tensorrt_mu_ptr));
+      if (*(trt_state->debug_enable_ptr)) {
+        std::cout << "TRT Debug: Compute..." << std::endl;
+      }
       const std::unordered_map<std::string, int>& input_indexes = (trt_state->input_info)[0];
       const std::unordered_map<std::string, int>& output_indexes = (trt_state->output_info)[0];
       const std::unordered_map<std::string, int>& output_types = (trt_state->output_info)[1];

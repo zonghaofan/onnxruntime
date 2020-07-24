@@ -19,6 +19,7 @@ static const std::string kFP16Enable = "ORT_TENSORRT_FP16_ENABLE";
 static const std::string kDumpSubgraphs = "ORT_TENSORRT_DUMP_SUBGRAPHS";
 static const std::string kEngineCacheEnable = "ORT_TENSORRT_ENGINE_CACHE_ENABLE";
 static const std::string kEngineCachePath = "ORT_TENSORRT_ENGINE_CACHE_PATH";
+static const std::string kDebugEnable = "ORT_TENSORRT_DEBUG_ENABLE";
 }  // namespace tensorrt_env_vars
 
 class TensorrtLogger : public nvinfer1::ILogger {
@@ -75,6 +76,7 @@ struct TensorrtFuncState {
   std::unordered_map<std::string, std::unordered_map<int, std::pair<int64_t, int64_t>>> input_shape_ranges;
   OrtMutex* tensorrt_mu_ptr = nullptr;
   bool* fp16_enable_ptr = nullptr;
+  bool* debug_enable_ptr = nullptr;  
   size_t* max_workspace_size_ptr = nullptr;
 };
 
@@ -103,6 +105,7 @@ class TensorrtExecutionProvider : public IExecutionProvider {
   int max_partition_iterations_ = 1000;
   int min_subgraph_size_ = 1;
   bool fp16_enable_ = false;
+  bool debug_enable_ = false;  
   bool dump_subgraphs_ = false;
   bool engine_cache_enable_ = false;
   std::string engine_cache_path_;

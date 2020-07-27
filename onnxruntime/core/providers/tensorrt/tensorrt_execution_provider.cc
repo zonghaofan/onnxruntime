@@ -166,7 +166,7 @@ TensorrtExecutionProvider::TensorrtExecutionProvider(const TensorrtExecutionProv
     }
     runtime_ = nvinfer1::createInferRuntime(GetTensorrtLogger());
   }
-  
+
   const std::string debug_enable_env = env_instance.GetEnvironmentVar(tensorrt_env_vars::kDebugEnable);
   if (!debug_enable_env.empty()) {
     debug_enable_ = (std::stoi(debug_enable_env) == 0 ? false : true);
@@ -384,10 +384,10 @@ SubGraphCollection_t TensorrtExecutionProvider::GetSupportedList(SubGraphCollect
       if (group.second) {
         nodes_list_output.push_back(group);
       } else {
-        onnxruntime::Model model_build(graph.Name(), true, ModelMetaData(), PathString(),
-                                       IOnnxRuntimeOpSchemaRegistryList(), graph.DomainToVersionMap(),
-                                       std::vector<ONNX_NAMESPACE::FunctionProto>(), *GetLogger());
-        onnxruntime::Graph& graph_build = model_build.MainGraph();
+        std::unique_ptr<onnxruntime::Model> model_build = std::make_unique<onnxruntime::Model>(graph.Name(), true, ModelMetaData(), PathString(),
+                                                                                               IOnnxRuntimeOpSchemaRegistryList(), graph.DomainToVersionMap(),
+                                                                                               std::vector<ONNX_NAMESPACE::FunctionProto>(), *GetLogger());  //slx
+        onnxruntime::Graph& graph_build = model_build->MainGraph();
 
         // Add node and node args
         // If node output is also parent graph output, the  output will be added to the
@@ -399,7 +399,25 @@ SubGraphCollection_t TensorrtExecutionProvider::GetSupportedList(SubGraphCollect
           for (auto input : node->InputDefs()) {
             auto& n_input = graph_build.GetOrCreateNodeArg(input->Name(), input->TypeAsProto());
             inputs.push_back(&n_input);
+            const ONNX_NAMESPACE::TensorProto* initializer = nullptr;  //slx
+            if (graph.GetInitializedTensor(input->Name(), initializer)) {
+              const ONNX_NAMESPACE::TensorProto* subgraph_initializer = nullptr;
+              if (!graph_build.GetInitializedTensor(input->Name(), subgraph_initializer)) {
+                graph_build.AddInitializedTensor(*(initializer));
+              }
+            }
           }
+
+          for (auto input : node->ImplicitInputDefs()) {  //slx
+            const ONNX_NAMESPACE::TensorProto* initializer = nullptr;
+            if (graph.GetInitializedTensor(input->Name(), initializer)) {
+              const ONNX_NAMESPACE::TensorProto* subgraph_initializer = nullptr;
+              if (!graph_build.GetInitializedTensor(input->Name(), subgraph_initializer)) {
+                graph_build.AddInitializedTensor(*(initializer));
+              }
+            }
+          }
+
           for (auto output : node->OutputDefs()) {
             auto& n_output = graph_build.GetOrCreateNodeArg(output->Name(), output->TypeAsProto());
             outputs.push_back(&n_output);
@@ -409,12 +427,6 @@ SubGraphCollection_t TensorrtExecutionProvider::GetSupportedList(SubGraphCollect
             }
           }
           graph_build.AddNode(node->Name(), node->OpType(), node->Description(), inputs, outputs, &node->GetAttributes(), node->Domain());
-        }
-
-        // Add initializers to the subgraph
-        const auto& init_tensors = graph.GetAllInitializedTensors();
-        for (const auto& tensor : init_tensors) {
-          graph_build.AddInitializedTensor(*(tensor.second));
         }
 
         ORT_ENFORCE(graph_build.Resolve().IsOK());
@@ -447,12 +459,12 @@ SubGraphCollection_t TensorrtExecutionProvider::GetSupportedList(SubGraphCollect
         }
 
         // Serialize modelproto to string
-        const onnxruntime::GraphViewer graph_viewer(graph_build);
+        const onnxruntime::GraphViewer graph_viewer(std::move(graph_build));  //slx
 
-        onnxruntime::Model model(graph_viewer.Name(), true, ModelMetaData(), PathString(),
-                                 IOnnxRuntimeOpSchemaRegistryList(), graph_viewer.DomainToVersionMap(),
-                                 std::vector<ONNX_NAMESPACE::FunctionProto>(), *GetLogger());
-        ONNX_NAMESPACE::ModelProto model_proto = model.ToProto();
+        std::unique_ptr<onnxruntime::Model> model = std::make_unique<onnxruntime::Model>(graph_viewer.Name(), true, ModelMetaData(), PathString(),
+                                                                                         IOnnxRuntimeOpSchemaRegistryList(), graph_viewer.DomainToVersionMap(),
+                                                                                         std::vector<ONNX_NAMESPACE::FunctionProto>(), *GetLogger());  //slx
+        ONNX_NAMESPACE::ModelProto model_proto = model->ToProto();
         ToGraphProtoInternal(graph_viewer, *(model_proto.mutable_graph()));
         model_proto.set_ir_version(ONNX_NAMESPACE::Version::IR_VERSION);
 
@@ -585,14 +597,17 @@ void TensorrtExecutionProvider::RemoveTensorRTGraphCycles(SubGraphCollection_t& 
     }
 
     // Remove TensorRT subgraph from the supported node list if it's part of the cycle
-    if (has_cycle) {
+    if (has_cycle) {  //slx
       for (int i = 0; i < static_cast<int>(cycles.size()); ++i) {
         auto loc = index_to_node_map.find(cycles[i]);
         if (loc != index_to_node_map.end() && loc->second.find("TRTKernel") != std::string::npos) {
-          int trt_node_index = std::stoi(loc->second.substr(10));
-          supported_nodes_vector.erase(supported_nodes_vector.begin() + trt_node_index);
-          trt_cycle = true;
-          break;
+          std::size_t found = loc->second.rfind("_");
+          if (found != std::string::npos) {
+            int trt_node_index = std::stoi(loc->second.substr(found + 1));
+            supported_nodes_vector.erase(supported_nodes_vector.begin() + trt_node_index);
+            trt_cycle = true;
+            break;
+          }
         }
       }
     }
@@ -609,7 +624,7 @@ TensorrtExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
   if (debug_enable_) {
     std::cout << "TRT Debug: GetCapability..." << std::endl;
   }
-  
+
   // Get supported node list from TensorRT parser
   std::vector<size_t> nodes_vector(graph.NumberOfNodes());
   std::iota(std::begin(nodes_vector), std::end(nodes_vector), 0);
@@ -618,7 +633,7 @@ TensorrtExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
   if (debug_enable_) {
     std::cout << "TRT Debug: GetSupportedList" << std::endl;
   }
-  
+
   bool early_termination = false;
   supported_nodes_vector = GetSupportedList(parser_nodes_vector, 0, max_partition_iterations_, graph, &early_termination);
   if (early_termination) {
@@ -639,7 +654,7 @@ TensorrtExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
   if (debug_enable_) {
     std::cout << "TRT Debug: GetSubGraph" << std::endl;
   }
-  
+
   // Construct subgraph capability from node list
   std::vector<std::unique_ptr<ComputeCapability>> result;
   int counter = 0, number_of_trt_nodes = 0;
@@ -657,7 +672,7 @@ TensorrtExecutionProvider::GetCapability(const onnxruntime::GraphViewer& graph,
   } else {
     LOGS_DEFAULT(INFO) << "Number of subgraphs running on TensorRT exeuction provider: " << number_of_subgraphs;
   }
-  
+
   if (debug_enable_) {
     std::cout << "TRT Debug: Number of TRT subgraphs: " << number_of_subgraphs << std::endl;
   }
@@ -670,7 +685,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
   if (debug_enable_) {
     std::cout << "TRT Debug: Compile..." << std::endl;
   }
-  
+
   for (const auto* fused_node : fused_nodes) {
     // Build map from input name to its index in input definitions
     std::unordered_map<std::string, int> input_map;
@@ -708,7 +723,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
       std::fstream dump(fused_node->Name() + ".onnx", std::ios::out | std::ios::trunc | std::ios::binary);
       model_proto.SerializeToOstream(&dump);
     }
-	
+
     if (debug_enable_) {
       std::cout << "TRT Debug: Fused node: " << fused_node->Name() << std::endl;
     }
@@ -758,7 +773,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
       trt_config->setFlag(nvinfer1::BuilderFlag::kFP16);
       trt_node_name_with_precision += "_fp16";
       LOGS_DEFAULT(VERBOSE) << "[TensorRT EP] FP16 mode is enabled.";
-    }    
+    }
 
     // Build TRT engine here if the graph doesn't have dynamic shape input. Otherwise engine will
     // be built at runtime
@@ -813,7 +828,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
       const auto& iter = output_map.find(output_name);
       if (iter != output_map.end()) {
         output_indexes[output_name] = iter->second;
-      }      
+      }
       const auto& tensor_type = graph_output[i].type().tensor_type();
       output_types[output_name] = tensor_type.elem_type();
     }
@@ -837,7 +852,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
       *p = {context->allocate_func, context->release_func, context->allocator_handle, parsers_[context->node_name].get(),
             &engines_[context->node_name], &contexts_[context->node_name], builders_[context->node_name].get(),
             networks_[context->node_name].get(), input_info_[context->node_name], output_info_[context->node_name],
-            input_shape_ranges_[context->node_name], &tensorrt_mu_, &fp16_enable_, &debug_enable_, 
+            input_shape_ranges_[context->node_name], &tensorrt_mu_, &fp16_enable_, &debug_enable_,
             &max_workspace_size_};
       *state = p.release();
       return 0;
@@ -850,7 +865,7 @@ common::Status TensorrtExecutionProvider::Compile(const std::vector<onnxruntime:
     };
 
     // Create compute function
-    compute_info.compute_func = [](FunctionState state, const OrtCustomOpApi* api, OrtKernelContext* context) {	  
+    compute_info.compute_func = [](FunctionState state, const OrtCustomOpApi* api, OrtKernelContext* context) {
       Ort::CustomOpApi ort{*api};
       TensorrtFuncState* trt_state = reinterpret_cast<TensorrtFuncState*>(state);
       std::lock_guard<OrtMutex> lock(*(trt_state->tensorrt_mu_ptr));

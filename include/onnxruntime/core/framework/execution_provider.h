@@ -34,8 +34,8 @@ using DestroyFunctionStateFunc = std::function<void(FunctionState)>;
 using UnorderedMapStringToString = std::unordered_map<std::string, std::string>;
 
 //data types for execution provider options
-using ProviderOptionsVector = std::vector<UnorderedMapStringToString>;  
-using ProviderOptionsMap = std::unordered_map<std::string, UnorderedMapStringToString>;  
+using ProviderOptionsVector = std::vector<UnorderedMapStringToString>;
+using ProviderOptionsMap = std::unordered_map<std::string, UnorderedMapStringToString>;
 
 struct NodeComputeInfo {
   CreateFunctionStateFunc create_state_func;
@@ -106,14 +106,14 @@ class IExecutionProvider {
   virtual int GetDeviceId() const { return -1; };
 
   /**
-     Get execution provider's configurations. 
+     Get execution provider's configurations.
    */
   const UnorderedMapStringToString& GetProviderOptions() const { return provider_options_; }
 
   /**
-     Store execution provider's configurations. 
+     Store execution provider's configurations.
    */
-  void SetProviderOptions(UnorderedMapStringToString& options) { 
+  void SetProviderOptions(UnorderedMapStringToString& options) {
     provider_options_ = options;
   }
 
@@ -190,6 +190,14 @@ class IExecutionProvider {
     return logger_;
   }
 
+  void SetSessionConfigurations(const std::unordered_map<int, std::string>* session_configurations) {
+    session_configurations_ = session_configurations;
+  }
+
+  const std::unordered_map<int, std::string>* GetSessionConfigurations() const {
+    return session_configurations_;
+  }
+
  private:
   const std::string type_;
   AllocatorMap allocators_;
@@ -200,5 +208,7 @@ class IExecutionProvider {
   std::vector<AllocatorPtr> allocator_list_;
   // It will be set when constructor is being called
   UnorderedMapStringToString provider_options_;
+
+  const std::unordered_map<int, std::string>* session_configurations_;
 };
 }  // namespace onnxruntime

@@ -354,6 +354,7 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
     if (enable_nnapi) {
 #ifdef USE_NNAPI
       Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_Nnapi(sf));
+      sf.SetSessionConfiguration(OrtSessionConfigKey::ORT_SESSION_CONFIG_EP_NNAPI_ENABLE_NCHW, "1");
 #else
       fprintf(stderr, "NNAPI is not supported in this build");
       return -1;

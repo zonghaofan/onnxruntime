@@ -222,8 +222,18 @@ common::Status NnapiExecutionProvider::Compile(const std::vector<onnxruntime::No
     {
       onnxruntime::GraphViewer graph_viewer(graph_body);
       nnapi::ModelBuilder builder(graph_viewer);
-      builder.SetUseNCHW(false);
+
+      bool use_nchw = false;
+      const auto* session_configurations = GetSessionConfigurations();
+      if (nullptr != session_configurations &&
+          session_configurations->find(OrtSessionConfigKey::ORT_SESSION_CONFIG_EP_NNAPI_ENABLE_NCHW) !=
+              session_configurations->end()) {
+        const std::string& config_value = session_configurations->at(OrtSessionConfigKey::ORT_SESSION_CONFIG_EP_NNAPI_ENABLE_NCHW);
+        use_nchw = config_value == "1";
+      }
+      builder.SetUseNCHW(use_nchw);
       builder.SetUseFp16(false);
+
       std::unique_ptr<nnapi::Model> nnapi_model = builder.Compile();
 
       // Build map from input name to its index in input definitions

@@ -342,6 +342,7 @@ common::Status InferenceSession::RegisterExecutionProvider(std::unique_ptr<IExec
   }
 
   p_exec_provider->SetLogger(session_logger_);
+  p_exec_provider->SetSessionConfigurations(&session_options_.session_configurations);
   return execution_providers_.Add(provider_type, std::move(p_exec_provider));
 }
 

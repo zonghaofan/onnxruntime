@@ -858,7 +858,6 @@ def generate_build_tree(cmake_path, source_dir, build_dir, cuda_home, cudnn_home
     for config in configs:
         config_build_dir = get_config_build_dir(build_dir, config)
         os.makedirs(config_build_dir, exist_ok=True)
-        print("AAAAAAAAAAAAAAAAAA" + os.environ['PATH'])
         if args.use_tvm:
             os.environ["PATH"] = os.path.join(
                 config_build_dir, "external", "tvm",

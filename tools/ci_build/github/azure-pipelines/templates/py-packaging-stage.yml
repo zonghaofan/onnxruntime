@@ -81,15 +81,12 @@ stages:
 
       - template: set-py-packaging-variables-step.yml
 
-      - task: CmdLine@2
+      - task: Docker@2
+        displayName: login
         inputs:
-          script: |
-            docker build --pull \
-              -t ${{ parameters.docker_image_prefix }}-manylinux \
-              --build-arg BUILD_USER=onnxruntimedev \
-              --build-arg BUILD_UID=$(id -u) \
-              -f Dockerfile.manylinux2010_cpu .
-          workingDirectory: $(Build.SourcesDirectory)/tools/ci_build/github/linux/docker
+          containerRegistry: onnxruntimeregistry
+          command: login
+          addPipelineData: false
       - task: CmdLine@2
         inputs:
           script: |
@@ -100,7 +97,7 @@ stages:
               --volume /data/models:/build/models:ro \
               -e NIGHTLY_BUILD \
               -e BUILD_BUILDNUMBER \
-              ${{ parameters.docker_image_prefix }}-manylinux \
+              onnxruntimeregistry.azurecr.io/internal/azureml/onnxruntimecpubuild:ch1 \
                 $(python.manylinux.dir)/bin/python3 /onnxruntime_src/tools/ci_build/build.py \
                   --build_dir /build \
                   --config Release \
@@ -113,7 +110,12 @@ stages:
                   ${{ parameters.build_py_parameters }} \
                   --cmake_extra_defines PYTHON_INCLUDE_DIR=$(python.manylinux.include.dir) PYTHON_LIBRARY=/usr/lib64/librt.so
           workingDirectory: $(Build.SourcesDirectory)
-
+      - task: Docker@2
+        displayName: logout
+        inputs:
+          containerRegistry: onnxruntimeregistry
+          command: logout
+          addPipelineData: false
       - task: CopyFiles@2
         displayName: 'Copy Python Wheel to: $(Build.ArtifactStagingDirectory)'
         inputs:

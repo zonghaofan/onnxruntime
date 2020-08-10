@@ -85,10 +85,9 @@ stages:
         inputs:
           script: |
             docker build --pull \
-              -t ${{ parameters.docker_image_prefix }}-manylinux-$(python.version) \
+              -t ${{ parameters.docker_image_prefix }}-manylinux \
               --build-arg BUILD_USER=onnxruntimedev \
               --build-arg BUILD_UID=$(id -u) \
-              --build-arg PYTHON_VERSION=$(python.version) \
               -f Dockerfile.manylinux2010_cpu .
           workingDirectory: $(Build.SourcesDirectory)/tools/ci_build/github/linux/docker
       - task: CmdLine@2
@@ -101,12 +100,13 @@ stages:
               --volume /data/models:/build/models:ro \
               -e NIGHTLY_BUILD \
               -e BUILD_BUILDNUMBER \
-              ${{ parameters.docker_image_prefix }}-manylinux-$(python.version) \
+              ${{ parameters.docker_image_prefix }}-manylinux \
                 $(python.manylinux.dir)/bin/python3 /onnxruntime_src/tools/ci_build/build.py \
                   --build_dir /build \
                   --config Release \
                   --skip_submodule_sync \
                   --parallel \
+                  --enable_lto \
                   --build_wheel \
                   --use_openmp \
                   --enable_onnx_tests \

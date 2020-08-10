@@ -144,11 +144,7 @@ try:
             if is_manylinux:
                 file = glob(path.join(self.dist_dir, '*linux*.whl'))[0]
                 logger.info('repairing %s for manylinux1', file)
-                try:
-                    subprocess.run(['auditwheel', 'repair', '-w', self.dist_dir, file], check=True, stdout=subprocess.PIPE)
-                finally:
-                    logger.info('removing %s', file)
-                    remove(file)
+                subprocess.run(['auditwheel', 'repair', '-w', self.dist_dir, file], check=True, stdout=subprocess.PIPE)
 
 except ImportError as error:
     print("Error importing dependencies:")
@@ -157,7 +153,7 @@ except ImportError as error:
 
 # Additional binaries
 if platform.system() == 'Linux':
-  libs = ['onnxruntime_pybind11_state.so', 'libdnnl.so.1', 'libmklml_intel.so', 'libiomp5.so', 'mimalloc.so']
+  libs = ['onnxruntime_pybind11_state.so', 'libdnnl.so.1', 'libmklml_intel.so', 'libmklml_gnu.so', 'libiomp5.so', 'mimalloc.so']
   # dnnl EP is built as shared lib
   libs.extend(['libonnxruntime_providers_dnnl.so'])
   # nGraph Libs
@@ -187,7 +183,7 @@ else:
     libs.extend(['onnxruntime_pywrapper.dll'])
 
 if is_manylinux:
-    data = ['capi/libonnxruntime_pywrapper.so'] if nightly_build else []
+    data = [path.join('capi', x) for x in libs if path.isfile(path.join('onnxruntime', 'capi', x))]
     ext_modules = [
         Extension(
             'onnxruntime.capi.onnxruntime_pybind11_state',

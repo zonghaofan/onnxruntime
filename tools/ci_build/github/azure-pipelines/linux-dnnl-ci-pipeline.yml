@@ -32,10 +32,10 @@ jobs:
               --skip_submodule_sync \
               --build_shared_lib \
               --parallel \
-              --build_wheel \
+              --enable_pybind \
               --use_openmp \
               --enable_onnx_tests \
-              --use_mklml --enable_pybind --build_java --build_nodejs \
+              --use_dnnl \
               --cmake_extra_defines PYTHON_INCLUDE_DIR=/opt/python/cp37-cp37m/include/python3.7m PYTHON_LIBRARY=/usr/lib64/librt.so
       workingDirectory: $(Build.SourcesDirectory)
   - task: Docker@2

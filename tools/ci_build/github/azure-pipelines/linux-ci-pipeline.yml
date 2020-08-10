@@ -1,6 +1,6 @@
 jobs:
-- job: Linux_py_Wheels
-  timeoutInMinutes: 180
+- job: Linux_Build
+  timeoutInMinutes: 120
   workspace:
     clean: all
   pool: Linux-CPU

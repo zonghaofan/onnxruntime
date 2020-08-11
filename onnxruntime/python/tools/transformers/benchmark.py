@@ -68,10 +68,10 @@ MODELS = {
     "gpt2": (["input_ids"], 11, False, "gpt2"),  # no past state inputs & outputs
     "gpt2-large": (["input_ids"], 11, True, "gpt2"),  # Model>2GB. Need use_external_data_format=True to export it.
 # Transformer-XL
-    "transfo-xl-wt103": (["input_ids"], 11, False, "bert"),
+    "transfo-xl-wt103": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # XLNet
     # Models uses Einsum, which need opset version 12 and PyTorch 1.5.0 or above.
-    "xlnet-base-cased": (["input_ids"], 12, False, "bert"),
+    "xlnet-base-cased": (["input_ids"], 12, False, "bert"), # Exception: Non-zero status code returned while running Add node. Name:'Add_36' Status Message: CUDA error cudaErrorInvalidConfiguration:invalid configuration argument
 # XLM
     "xlm-mlm-en-2048": (["input_ids"], 11, True, "bert"),
 # RoBERTa
@@ -80,28 +80,31 @@ MODELS = {
     "distilbert-base-uncased": (["input_ids", "attention_mask"], 11, False, "bert"),
     "distilgpt2": (["input_ids"], 11, False, "gpt2"),  # no past state inputs & outputs
 # CTRL
-    "ctrl": (["input_ids"], 11, True, "bert"),
+    "ctrl": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # CamemBERT
-    "camembert-base": (["input_ids"], 11, False, "bert"),
+    "camembert-base": (["input_ids"], 11, False, "bert"), # Partial optimized. Output tensor 0 is not close: rtol=0.0001, atol=0.0001
 # ALBERT
     # Models uses Einsum, which need opset version 12 and PyTorch 1.5.0 or above.
     "albert-base-v2": (["input_ids"], 12, False, "bert"),
 # T5
-    "t5-base": (["input_ids"], 11, False, "bert"),
+    "t5-base": (["input_ids", "token_type_ids"], 11, False, "bert"), # ValueError: You have to specify either decoder_input_ids or decoder_inputs_embeds
 # XLM-RoBERTa
     "xlm-roberta-base": (["input_ids"], 11, False, "bert"),
 # FlauBERT
-    "flaubert/flaubert_base_uncased": (["input_ids"], 11, False, "bert"),
+    "flaubert/flaubert_base_uncased": (["input_ids"], 11, False, "bert"), # Partial optimized. Output tensor 0 is not close: rtol=0.0001, atol=0.0001
 # Bart
-    "facebook/bart-base": (["input_ids"], 11, False, "bert"),
+    "facebook/bart-base": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # DialoGPT
-    "DialoGPT-medium": (["input_ids"], 11, False, "bert"),
+    "DialoGPT-small": (["input_ids"], 11, False, "bert"), # Can't load config for 'DialoGPT-medium'
+    "microsoft/DialoGPT-small": (["input_ids"], 11, False, "bert"), # KeyError: 'microsoft/DialoGPT-small'
 # Reformer
-    "reformer-enwik8": (["input_ids"], 11, False, "bert"),
+    "reformer-enwik8": (["input_ids"], 11, False, "gpt2"), # Can't load config for 'reformer-enwik8'
+    "google/reformer-enwik8": (["input_ids"], 11, False, "gpt2"), # OSError: Model name 'google/reformer-enwik8' was not found in tokenizers model name list
+    "google/reformer-crime-and-punishment": (["input_ids"], 11, False, "gpt2"), #RuntimeError: The size of tensor a (12) must match the size of tensor b (0) at non-singleton dimension 1
 # MarianMT
-    #"Helsinki-NLP/opus-mt-{src}-{tgt}": (["input_ids"], 11, False, "bert"),
+    "Helsinki-NLP/opus-mt-ROMANCE-en": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # Longformer
-    "allenai/longformer-base-4096": (["input_ids"], 11, False, "bert"),
+    "allenai/longformer-base-4096": (["input_ids"], 12, False, "bert"), # Exporting the operator as_strided to ONNX opset version 12 is not supported
 }
 
 cpu_count = psutil.cpu_count(logical=True)

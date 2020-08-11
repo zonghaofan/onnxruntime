@@ -18,6 +18,7 @@ jobs:
   - task: CmdLine@2
     inputs:
       script: |
+        mkdir -p $HOME/.onnx
         docker run --rm \
           --volume /data/onnx:/data/onnx:ro \
           --volume $(Build.SourcesDirectory):/onnxruntime_src \

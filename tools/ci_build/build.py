@@ -584,21 +584,6 @@ def generate_build_tree(cmake_path, source_dir, build_dir, cuda_home, cudnn_home
         "-Donnxruntime_USE_DNNL=" + ("ON" if args.use_dnnl else "OFF"),
         "-Donnxruntime_USE_MKLML=" + ("ON" if args.use_mklml else "OFF"),
         "-Donnxruntime_USE_NGRAPH=" + ("ON" if args.use_ngraph else "OFF"),
-        "-Donnxruntime_USE_OPENVINO=" + ("ON" if args.use_openvino else "OFF"),
-        "-Donnxruntime_USE_OPENVINO_MYRIAD=" + (
-            "ON" if args.use_openvino == "MYRIAD_FP16" else "OFF"),
-        "-Donnxruntime_USE_OPENVINO_GPU_FP32=" + (
-            "ON" if args.use_openvino == "GPU_FP32" else "OFF"),
-        "-Donnxruntime_USE_OPENVINO_GPU_FP16=" + (
-            "ON" if args.use_openvino == "GPU_FP16" else "OFF"),
-        "-Donnxruntime_USE_OPENVINO_CPU_FP32=" + (
-            "ON" if args.use_openvino == "CPU_FP32" else "OFF"),
-        "-Donnxruntime_USE_OPENVINO_VAD_M=" + (
-            "ON" if args.use_openvino == "VAD-M_FP16" else "OFF"),
-        "-Donnxruntime_USE_OPENVINO_VAD_F=" + (
-            "ON" if args.use_openvino == "VAD-F_FP32" else "OFF"),
-        "-Donnxruntime_USE_OPENVINO_BINARY=" + (
-            "ON" if args.use_openvino else "OFF"),
         "-Donnxruntime_USE_NNAPI_BUILTIN=" + ("ON" if args.use_nnapi else "OFF"),
         "-Donnxruntime_USE_RKNPU=" + ("ON" if args.use_rknpu else "OFF"),
         "-Donnxruntime_USE_OPENMP=" + (
@@ -674,7 +659,22 @@ def generate_build_tree(cmake_path, source_dir, build_dir, cuda_home, cudnn_home
     if args.winml_root_namespace_override:
         cmake_args += ["-Donnxruntime_WINML_NAMESPACE_OVERRIDE=" +
                        args.winml_root_namespace_override]
-
+    if args.use_openvino:
+        cmake_args += ["-Donnxruntime_USE_OPENVINO=ON",
+                       "-Donnxruntime_USE_OPENVINO_MYRIAD=" + (
+                           "ON" if args.use_openvino == "MYRIAD_FP16" else "OFF"),
+                       "-Donnxruntime_USE_OPENVINO_GPU_FP32=" + (
+                           "ON" if args.use_openvino == "GPU_FP32" else "OFF"),
+                       "-Donnxruntime_USE_OPENVINO_GPU_FP16=" + (
+                           "ON" if args.use_openvino == "GPU_FP16" else "OFF"),
+                       "-Donnxruntime_USE_OPENVINO_CPU_FP32=" + (
+                           "ON" if args.use_openvino == "CPU_FP32" else "OFF"),
+                       "-Donnxruntime_USE_OPENVINO_VAD_M=" + (
+                           "ON" if args.use_openvino == "VAD-M_FP16" else "OFF"),
+                       "-Donnxruntime_USE_OPENVINO_VAD_F=" + (
+                           "ON" if args.use_openvino == "VAD-F_FP32" else "OFF"),
+                       "-Donnxruntime_USE_OPENVINO_BINARY=" + (
+                           "ON" if args.use_openvino else "OFF")]
     # temp turn on only for linux gpu build
     if not is_windows():
         if args.use_cuda:
@@ -1410,11 +1410,10 @@ def build_protoc_for_host(cmake_path, source_dir, build_dir, args):
         cmd_args += ['-G', args.cmake_generator]
     if is_windows():
         if not is_ninja:
-            cmd_args += ['-T', 'host=x64']        
+            cmd_args += ['-T', 'host=x64']
     elif is_macOS():
         if args.use_xcode:
             cmd_args += ['-G', 'Xcode']
-        
 
     run_subprocess(cmd_args, cwd=protoc_build_dir)
     # Build step

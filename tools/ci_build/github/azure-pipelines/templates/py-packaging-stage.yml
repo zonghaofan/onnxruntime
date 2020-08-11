@@ -95,6 +95,7 @@ stages:
               --volume $(Build.SourcesDirectory):/onnxruntime_src \
               --volume $(Build.BinariesDirectory):/build \
               --volume /data/models:/build/models:ro \
+              --volume $HOME/.onnx:/home/onnxruntimedev/.onnx \
               -e NIGHTLY_BUILD \
               -e BUILD_BUILDNUMBER \
               onnxruntimeregistry.azurecr.io/internal/azureml/onnxruntimecpubuild:ch1 \
@@ -177,6 +178,7 @@ stages:
               --volume $(Build.SourcesDirectory):/onnxruntime_src \
               --volume $(Build.BinariesDirectory):/build \
               --volume /data/models:/build/models:ro \
+              --volume $HOME/.onnx:/home/onnxruntimedev/.onnx \
               -e NVIDIA_VISIBLE_DEVICES=all \
               -e NIGHTLY_BUILD \
               -e BUILD_BUILDNUMBER \

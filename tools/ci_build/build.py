@@ -1406,7 +1406,7 @@ def build_protoc_for_host(cmake_path, source_dir, build_dir, args):
     ]
 
     is_ninja = args.cmake_generator == 'Ninja'
-    if args.cmake_generator is not None and not args.use_xcode:
+    if args.cmake_generator is not None and not (is_macOS() and args.use_xcode):
         cmd_args += ['-G', args.cmake_generator]
     if is_windows():
         if not is_ninja:

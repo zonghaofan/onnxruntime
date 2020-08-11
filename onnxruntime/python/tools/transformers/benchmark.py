@@ -59,22 +59,49 @@ logger = logging.getLogger('')
 # List of pretrained models: https://huggingface.co/transformers/pretrained_models.html
 # Pretrained model name to a tuple of input names, opset_version, use_external_data_format and optimization model type
 MODELS = {
+# BERT
     "bert-base-cased": (["input_ids", "attention_mask", "token_type_ids"], 11, False, "bert"),
-    "distilbert-base-uncased": (["input_ids", "attention_mask"], 11, False, "bert"),
-    "roberta-base": (["input_ids", "attention_mask"], 11, False, "bert"),
-
+# GPT
+    "openai-gpt": (["input_ids"], 11, False, "gpt2"),  # no past state inputs
+# GPT-2
     # No past state inputs for GPT models.
     "gpt2": (["input_ids"], 11, False, "gpt2"),  # no past state inputs & outputs
     "gpt2-large": (["input_ids"], 11, True, "gpt2"),  # Model>2GB. Need use_external_data_format=True to export it.
+# Transformer-XL
+    "transfo-xl-wt103": (["input_ids"], 11, False, "bert"),
+# XLNet
+    # Models uses Einsum, which need opset version 12 and PyTorch 1.5.0 or above.
+    "xlnet-base-cased": (["input_ids"], 12, False, "bert"),
+# XLM
+    "xlm-mlm-en-2048": (["input_ids"], 11, True, "bert"),
+# RoBERTa
+    "roberta-base": (["input_ids", "attention_mask"], 11, False, "bert"),
+# DistilBERT
+    "distilbert-base-uncased": (["input_ids", "attention_mask"], 11, False, "bert"),
     "distilgpt2": (["input_ids"], 11, False, "gpt2"),  # no past state inputs & outputs
-
-    #"openai-gpt": (["input_ids"], 11, False, "gpt2"),  # no past state inputs
-
+# CTRL
+    "ctrl": (["input_ids"], 11, True, "bert"),
+# CamemBERT
+    "camembert-base": (["input_ids"], 11, False, "bert"),
+# ALBERT
     # Models uses Einsum, which need opset version 12 and PyTorch 1.5.0 or above.
     "albert-base-v2": (["input_ids"], 12, False, "bert"),
-    #"xlnet-base-cased": (["input_ids"], 12, False, "bert"),
-
-    #"xlm-mlm-en-2048": (["input_ids"], 11, True, "bert"),
+# T5
+    "t5-base": (["input_ids"], 11, False, "bert"),
+# XLM-RoBERTa
+    "xlm-roberta-base": (["input_ids"], 11, False, "bert"),
+# FlauBERT
+    "flaubert/flaubert_base_uncased": (["input_ids"], 11, False, "bert"),
+# Bart
+    "facebook/bart-base": (["input_ids"], 11, False, "bert"),
+# DialoGPT
+    "DialoGPT-medium": (["input_ids"], 11, False, "bert"),
+# Reformer
+    "reformer-enwik8": (["input_ids"], 11, False, "bert"),
+# MarianMT
+    #"Helsinki-NLP/opus-mt-{src}-{tgt}": (["input_ids"], 11, False, "bert"),
+# Longformer
+    "allenai/longformer-base-4096": (["input_ids"], 11, False, "bert"),
 }
 
 cpu_count = psutil.cpu_count(logical=True)

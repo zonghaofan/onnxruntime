@@ -1,6 +1,5 @@
 FROM quay.io/pypa/manylinux2010_x86_64:latest
 
-ARG PYTHON_VERSION
 ADD manylinux /tmp/scripts
 RUN cd /tmp/scripts && /tmp/scripts/install_centos.sh && /tmp/scripts/install_deps.sh  && rm -rf /tmp/scripts
 
@@ -9,4 +8,4 @@ ARG BUILD_USER=onnxruntimedev
 RUN adduser --uid $BUILD_UID $BUILD_USER
 WORKDIR /home/$BUILD_USER
 USER $BUILD_USER
-ENV PATH /usr/local/gradle/bin:$PATH
+ENV PATH /usr/local/gradle/bin:/usr/local/dotnet:$PATH

@@ -705,16 +705,6 @@ def generate_build_tree(cmake_path, source_dir, build_dir, cuda_home, cudnn_home
             "-DANDROID_ABI=" + str(args.android_abi)
         ]
 
-    is_ninja = args.cmake_generator == 'Ninja'
-    if args.cmake_generator is not None and not (is_macOS() and args.use_xcode):
-        cmd_args += ['-G', args.cmake_generator]
-    if is_windows():
-        if not is_ninja:
-            cmd_args += ['-T', 'host=x64']
-    elif is_macOS():
-        if args.use_xcode:
-            cmd_args += ['-G', 'Xcode']
-
     if args.ios:
         if is_macOS():
             needed_args = [
@@ -1611,6 +1601,10 @@ def main():
                 cmake_extra_args.append(
                     '-DCMAKE_TOOLCHAIN_FILE=' + os.path.join(
                         source_dir, 'cmake', 'wcos_toolchain.cmake'))
+        elif args.cmake_generator is not None and not (is_macOS() and args.use_xcode):
+            cmake_extra_args += ['-G', args.cmake_generator]
+        elif is_macOS() and args.use_xcode:
+            cmake_extra_args += ['-G', 'Xcode']
 
         if (args.android or args.ios) and args.path_to_protoc_exe is None:
             # Cross-compiling for Android and iOS

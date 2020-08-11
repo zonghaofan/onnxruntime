@@ -905,7 +905,7 @@ def build_targets(args, cmake_path, build_dir, configs, parallel):
             elif (is_macOS() and args.use_xcode):
                 # CMake will generate correct build tool args for Xcode
                 cmd_args += ["--parallel", num_cores]
-            else:
+            elif args.cmake_generator != 'Ninja':
                 build_tool_args += ["-j" + num_cores]
 
         if build_tool_args:

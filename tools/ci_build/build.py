@@ -1406,16 +1406,15 @@ def build_protoc_for_host(cmake_path, source_dir, build_dir, args):
     ]
 
     is_ninja = args.cmake_generator == 'Ninja'
-
+    if args.cmake_generator is not None and not args.use_xcode:
+        cmd_args += ['-G', args.cmake_generator]
     if is_windows():
         if not is_ninja:
-            cmd_args += ['-T', 'host=x64']
-        cmd_args += ['-G', args.cmake_generator]
+            cmd_args += ['-T', 'host=x64']        
     elif is_macOS():
         if args.use_xcode:
             cmd_args += ['-G', 'Xcode']
-        elif args.cmake_generator is not None:
-            cmd_args += ['-G', args.cmake_generator]
+        
 
     run_subprocess(cmd_args, cwd=protoc_build_dir)
     # Build step

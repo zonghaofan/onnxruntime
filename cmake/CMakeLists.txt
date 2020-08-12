@@ -770,12 +770,6 @@ if (onnxruntime_USE_MKLML)
   link_directories(${MKLML_LIB_DIR})
 endif()
 
-if (onnxruntime_USE_DNNL)
-  list(APPEND onnxruntime_EXTERNAL_LIBRARIES dnnl)
-  list(APPEND onnxruntime_EXTERNAL_DEPENDENCIES project_dnnl)
-  link_directories(${DNNL_LIB_DIR})
-endif()
-
 if (onnxruntime_USE_NGRAPH)
   #if (onnxruntime_USE_OPENMP)
   #  message(FATAL_ERROR "Please set onnxruntime_USE_OPENMP=OFF for nGraph execution provider.")

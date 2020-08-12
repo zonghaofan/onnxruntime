@@ -895,6 +895,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
         const std::string& input_name = input->getName();
         nvinfer1::Dims dims = input->getDimensions();
         int nb_dims = dims.nbDims;
+        std::cout << "input " << i << " : input_name" << input_name << std::endl;
 
         // Check and update shape ranges for dynamic shape inputs
         dimension_update[input_name] = false;
@@ -915,11 +916,12 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
             // Get shape values for shape tensor input
             const auto& tensor_type = ort.GetTensorElementType(tensor_info);
             int shape_size = nb_dims == 0 ? 1 : tensor_shapes[0];
-            tensor_shape_values[input_name].reserve(shape_size);
+			std::cout << "input is isShapeTensor, " << "nb_dims: " << nb_dims << ", shape_size: " << shape_size << std::endl;
+            tensor_shape_values[input_name].resize(shape_size);
             switch (tensor_type) {
               case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32: {
                 int32_t* input = new int32_t[shape_size];
-                cudaMemcpy(input, ort.GetTensorData<int32_t>(input_tensor), shape_size * sizeof(int32_t), cudaMemcpyDeviceToHost);
+                CUDA_RETURN_IF_ERROR(cudaMemcpy(input, ort.GetTensorData<int32_t>(input_tensor), shape_size * sizeof(int32_t), cudaMemcpyDeviceToHost));
                 for (int j = 0; j < shape_size; ++j) {
                   tensor_shape_values[input_name][j] = input[j];
                 }
@@ -928,7 +930,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
               }
               case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64: {
                 int64_t* input = new int64_t[shape_size];
-                cudaMemcpy(input, ort.GetTensorData<int64_t>(input_tensor), shape_size * sizeof(int64_t), cudaMemcpyDeviceToHost);
+                CUDA_RETURN_IF_ERROR(cudaMemcpy(input, ort.GetTensorData<int64_t>(input_tensor), shape_size * sizeof(int64_t), cudaMemcpyDeviceToHost));
                 for (int j = 0; j < shape_size; ++j) {
                   tensor_shape_values[input_name][j] = static_cast<int32_t>(input[j]);
                 }
@@ -966,6 +968,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
                   shapes_opt[j] = tensor_shape_value;
                   dimension_update[input_name] = true;
                 }
+				std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], shapes_min[j]=" << shapes_min[j] << ", shapes_opt[j]=" << shapes_opt[j] << ", shapes_max[j]=" << shapes_max[j] << std::endl;
               }
             } else {
               // If shape size doesn't match, initialize shape_range with the new shape value
@@ -976,6 +979,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
                 shapes_min[j] = tensor_shape_value;
                 shapes_opt[j] = tensor_shape_value;
                 shapes_max[j] = tensor_shape_value;
+				std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], shapes_min[j]=" << shapes_min[j] << ", shapes_opt[j]=" << shapes_opt[j] << ", shapes_max[j]=" << shapes_max[j] << std::endl;
               }
               dimension_update[input_name] = true;
             }
@@ -991,6 +995,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
 
           } else  //execution tensor
           {
+			std::cout << "input is execution tensor, " << "nb_dims: " << nb_dims << std::endl;
             nvinfer1::Dims dims_min(dims), dims_opt(dims), dims_max(dims);
             for (int j = 0, end = nb_dims; j < end; ++j) {
               const auto& tensor_shape = tensor_shapes[j];
@@ -1013,7 +1018,10 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
                   dims_opt.d[j] = tensor_shape;
                   dimension_update[input_name] = true;
                 }
-              }
+				std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], dims_min.d[j]=" << dims_min.d[j] << ", dims_opt.d[j]=" << dims_opt.d[j] << ", dims_max.d[j]=" << dims_max.d[j] << std::endl;	
+              } else {
+				std::cout << "j=" << j << ": no shape_range[j], dims_min.d[j]=" << dims_min.d[j] << ", dims_opt.d[j]=" << dims_opt.d[j] << ", dims_max.d[j]=" << dims_max.d[j] << std::endl;
+			  }
             }
 
             if (dimension_update[input_name]) {

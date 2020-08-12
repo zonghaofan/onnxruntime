@@ -1166,14 +1166,8 @@ endif()
 # built; hence the ordering
 if (onnxruntime_BUILD_UNIT_TESTS)
   if (onnxruntime_ENABLE_PYTHON)
-    if(UNIX)
-      set(CMAKE_SKIP_BUILD_RPATH ON)
-    endif()
     include(onnxruntime_python.cmake)
   endif()
-  # we need to make sure this is turned off since it
-  # turned ON by the previous step when building a shared lib
-  set(CMAKE_SKIP_BUILD_RPATH OFF)
   include(onnxruntime_unittests.cmake)
 endif()
 

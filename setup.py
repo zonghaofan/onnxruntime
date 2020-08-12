@@ -194,7 +194,7 @@ else:
     libs.extend(['onnxruntime_pywrapper.dll'])
 
 if is_manylinux:
-    data = [path.join('capi', x) for x in libs if path.isfile(path.join('onnxruntime', 'capi', x))]
+    data = ['capi/libonnxruntime_pywrapper.so'] if nightly_build else []
     ext_modules = [
         Extension(
             'onnxruntime.capi.onnxruntime_pybind11_state',

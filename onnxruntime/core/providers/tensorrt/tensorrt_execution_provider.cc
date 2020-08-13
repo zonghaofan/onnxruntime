@@ -969,7 +969,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
                   shapes_opt[j] = tensor_shape_value;
                   dimension_update[input_name] = true;
                 }
-				std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], shapes_min[j]=" << shapes_min[j] << ", shapes_opt[j]=" << shapes_opt[j] << ", shapes_max[j]=" << shapes_max[j] << std::endl;
+                std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], shapes_min[j]=" << shapes_min[j] << ", shapes_opt[j]=" << shapes_opt[j] << ", shapes_max[j]=" << shapes_max[j] << std::endl;
               }
             } else {
               // If shape size doesn't match, initialize shape_range with the new shape value
@@ -980,7 +980,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
                 shapes_min[j] = tensor_shape_value;
                 shapes_opt[j] = tensor_shape_value;
                 shapes_max[j] = tensor_shape_value;
-				std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], shapes_min[j]=" << shapes_min[j] << ", shapes_opt[j]=" << shapes_opt[j] << ", shapes_max[j]=" << shapes_max[j] << std::endl;
+                std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], shapes_min[j]=" << shapes_min[j] << ", shapes_opt[j]=" << shapes_opt[j] << ", shapes_max[j]=" << shapes_max[j] << std::endl;
               }
               dimension_update[input_name] = true;
             }
@@ -996,7 +996,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
 
           } else  //execution tensor
           {
-			std::cout << "input is execution tensor, " << "nb_dims: " << nb_dims << std::endl;
+            std::cout << "input is execution tensor, " << "nb_dims: " << nb_dims << std::endl;
             nvinfer1::Dims dims_min(dims), dims_opt(dims), dims_max(dims);
             for (int j = 0, end = nb_dims; j < end; ++j) {
               const auto& tensor_shape = tensor_shapes[j];
@@ -1019,10 +1019,10 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
                   dims_opt.d[j] = tensor_shape;
                   dimension_update[input_name] = true;
                 }
-				std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], dims_min.d[j]=" << dims_min.d[j] << ", dims_opt.d[j]=" << dims_opt.d[j] << ", dims_max.d[j]=" << dims_max.d[j] << std::endl;	
+                std::cout << "j=" << j << ": shape_range[j]=[" << shape_range[j].first << "," << shape_range[j].second << "], dims_min.d[j]=" << dims_min.d[j] << ", dims_opt.d[j]=" << dims_opt.d[j] << ", dims_max.d[j]=" << dims_max.d[j] << std::endl;	
               } else {
-				std::cout << "j=" << j << ": no shape_range[j], dims_min.d[j]=" << dims_min.d[j] << ", dims_opt.d[j]=" << dims_opt.d[j] << ", dims_max.d[j]=" << dims_max.d[j] << std::endl;
-			  }
+                std::cout << "j=" << j << ": no shape_range[j], dims_min.d[j]=" << dims_min.d[j] << ", dims_opt.d[j]=" << dims_opt.d[j] << ", dims_max.d[j]=" << dims_max.d[j] << std::endl;
+              }
             }
 
             if (dimension_update[input_name]) {
@@ -1047,13 +1047,13 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
       if (engine_update) {
         auto trt_config = tensorrt_ptr::unique_pointer<nvinfer1::IBuilderConfig>(trt_builder->createBuilderConfig());
         trt_config->setMaxWorkspaceSize(*(trt_state->max_workspace_size_ptr));
-        trt_config->addOptimizationProfile(trt_profile);
+        auto profile_index = trt_config->addOptimizationProfile(trt_profile);
         if (*(trt_state->fp16_enable_ptr) && trt_builder->platformHasFastFp16()) {
           trt_config->setFlag(nvinfer1::BuilderFlag::kFP16);
         }
         trt_state->context->reset();
         trt_state->engine->reset();
-		std::cout << "trt_state->network: " << trt_state->network << ", trt_profile: " << trt_profile << ", trt_profile->isValid: " << trt_profile->isValid() << ", profile_index: " << profile_index << ", trt_builder: " << trt_builder << std::endl;		
+        std::cout << "trt_state->network: " << trt_state->network << ", trt_profile: " << trt_profile << ", trt_profile->isValid: " << trt_profile->isValid() << ", profile_index: " << profile_index << ", trt_builder: " << trt_builder << std::endl;		
         *(trt_state->engine) = tensorrt_ptr::unique_pointer<nvinfer1::ICudaEngine>(
             trt_builder->buildEngineWithConfig(*trt_state->network, *trt_config));
         std::cout << "trt_state->engine->get(): " << trt_state->engine->get() << std::endl;	

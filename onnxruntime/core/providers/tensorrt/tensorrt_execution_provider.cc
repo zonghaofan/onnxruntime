@@ -897,7 +897,6 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
         nvinfer1::Dims dims = input->getDimensions();
         int nb_dims = dims.nbDims;
         std::cout << "input " << i << " : input_name" << input_name << std::endl;
-
         // Check and update shape ranges for dynamic shape inputs
         dimension_update[input_name] = false;
         if (shape_ranges.find(input_name) != shape_ranges.end()) {
@@ -917,7 +916,7 @@ common::Status TensorrtExecutionProvider::Provider_Compile(const std::vector<onn
             // Get shape values for shape tensor input
             const auto& tensor_type = ort.GetTensorElementType(tensor_info);
             int shape_size = nb_dims == 0 ? 1 : tensor_shapes[0];
-			std::cout << "input is isShapeTensor, " << "nb_dims: " << nb_dims << ", shape_size: " << shape_size << std::endl;
+	    std::cout << "input is isShapeTensor, " << "nb_dims: " << nb_dims << ", shape_size: " << shape_size << std::endl;
             tensor_shape_values[input_name].resize(shape_size);
             switch (tensor_type) {
               case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32: {

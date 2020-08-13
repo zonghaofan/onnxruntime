@@ -17,20 +17,20 @@ run_cli=false
 run_install=false
 
 # Engines to test.
-run_ort=false
+run_ort=true
 run_torch=true
-run_torchscript=false
+run_torchscript=true
 
 # Devices to test (You can run either CPU or GPU, but not both: gpu need onnxruntime-gpu, and CPU need onnxruntime).
-run_gpu_fp32=true
-run_gpu_fp16=true
-run_cpu_fp32=false
-run_cpu_int8=false
+run_gpu_fp32=false
+run_gpu_fp16=false
+run_cpu_fp32=true
+run_cpu_int8=true
 
-average_over=10
+average_over=1000
 # CPU takes longer time to run, only run 100 inferences to get average latency.
 if [ "$run_cpu" = true ] ; then
-  average_over=1
+  average_over=100
 fi
 
 # Enable optimizer (use script instead of OnnxRuntime for graph optimization)
@@ -38,7 +38,7 @@ use_optimizer=true
 
 # Batch Sizes and Sequence Lengths
 batch_sizes="1"
-sequence_lengths="4"
+sequence_lengths="128"
 
 # Number of inputs (input_ids, token_type_ids, attention_mask) for ONNX model.
 # Not that different input count might lead to different performance
@@ -46,7 +46,8 @@ sequence_lengths="4"
 input_counts=1
 
 # Pretrained transformers models can be a subset of: bert-base-cased roberta-base gpt2 distilgpt2 distilbert-base-uncased
-models_to_test="ctrl camembert-base t5-base xlm-roberta-base flaubert/flaubert_base_uncased facebook/bart-base DialoGPT-medium reformer-enwik8 allenai/longformer-base-4096"
+models_to_test="bert-base-cased bert-base-uncased openai-gpt gpt2 gpt2-large transfo-xl-wt103 xlnet-base-cased xlm-mlm-ende-1024 xlm-mlm-en-2048 roberta-base distilroberta-base distilbert-base-uncased distilgpt2 ctrl camembert-base albert-base-v1 albert-base-v2 t5-base t5-small xlm-roberta-base flaubert/flaubert_base_uncased flaubert/flaubert_base_cased flaubert/flaubert_small_cased facebook/bart-base microsoft/DialoGPT-small google/reformer-enwik8 google/reformer-crime-and-punishment Helsinki-NLP/opus-mt-ROMANCE-en allenai/longformer-base-4096"
+#"bert-base-cased bert-base-uncased openai-gpt gpt2 gpt2-large transfo-xl-wt103 xlnet-base-cased xlm-mlm-ende-1024 xlm-mlm-en-2048 roberta-base distilroberta-base distilbert-base-uncased distilgpt2 ctrl camembert-base albert-base-v1 albert-base-v2 t5-base t5-small xlm-roberta-base flaubert/flaubert_base_uncased flaubert/flaubert_base_cased flaubert/flaubert_small_cased facebook/bart-base microsoft/DialoGPT-small google/reformer-enwik8 google/reformer-crime-and-punishment Helsinki-NLP/opus-mt-ROMANCE-en allenai/longformer-base-4096"
 
 # If you have mutliple GPUs, you can choose one GPU for test. Here is an example to use the second GPU:
 # export CUDA_VISIBLE_DEVICES=1
@@ -104,4 +105,90 @@ benchmark_options="-b $batch_sizes -s $sequence_lengths -t $average_over -f fusi
 
 if [ "$use_optimizer" = true ] ; then
   onnx_export_options="$onnx_export_options -o"
-  benchmark_options="$benc
+  benchmark_options="$benchmark_options -o"
+fi
+
+if [ "$use_raw_attention_mask" = true ] ; then
+  onnx_export_options="$onnx_export_options --use_raw_attention_mask"
+  benchmark_options="$benchmark_options --use_raw_attention_mask"
+fi
+
+# -------------------------------------------
+run_one_test() {
+    if [ "$run_ort" = true ] ; then
+      echo python $benchmark_script -m $1 $onnx_export_options $2 $3 $4 >> benchmark.log
+      echo python $benchmark_script -m $1 $benchmark_options $2 $3 $4 -i $input_counts >> benchmark.log
+      if [ "$run_tests" = true ] ; then
+        python $benchmark_script -m $1 $onnx_export_options $2 $3 $4
+        python $benchmark_script -m $1 $benchmark_options $2 $3 $4 -i $input_counts
+      fi
+    fi
+
+    if [ "$run_torch" = true ] ; then
+      echo python $benchmark_script -e torch -m $1 $benchmark_options $2 $3 $4 >> benchmark.log
+      if [ "$run_tests" = true ] ; then
+        python $benchmark_script -e torch -m $1 $benchmark_options $2 $3 $4
+      fi
+    fi
+
+    if [ "$run_torchscript" = true ] ; then
+      echo python $benchmark_script -e torchscript -m $1 $benchmark_options $2 $3 $4 >> benchmark.log
+      if [ "$run_tests" = true ] ; then
+        python $benchmark_script -e torchscript -m $1 $benchmark_options $2 $3 $4
+      fi
+    fi
+}
+
+# -------------------------------------------
+if [ "$run_gpu_fp32" = true ] ; then
+  for m in $models_to_test
+  do
+    rm -r cache_models
+    rm -r onnx_models
+    mkdir onnx_models
+    echo Run GPU FP32 Benchmark on model ${m}
+    run_one_test "${m}" -g
+  done
+fi
+
+if [ "$run_gpu_fp16" = true ] ; then
+  for m in $models_to_test
+  do
+    rm -r cache_models
+    rm -r onnx_models
+    mkdir onnx_models
+    echo Run GPU FP16 Benchmark on model ${m}
+    run_one_test "${m}" -g -p fp16
+  done
+fi
+
+if [ "$run_cpu_fp32" = true ] ; then
+  for m in $models_to_test
+  do
+    rm -r cache_models
+    rm -r onnx_models
+    mkdir onnx_models
+    echo Run CPU Benchmark on model ${m}
+    run_one_test "${m}"
+  done
+fi
+
+if [ "$run_cpu_int8" = true ] ; then
+  for m in $models_to_test
+  do
+    rm -r cache_models
+    rm -r onnx_models
+    mkdir onnx_models
+    echo Run CPU Benchmark on model ${m}
+    run_one_test "${m}" -p int8
+  done
+fi
+
+if [ "run_tests" = false ] ; then
+    more $log_file
+fi
+
+# Remove duplicated lines
+awk '!x[$0]++' ./result.csv > summary_result.csv
+awk '!x[$0]++' ./fusion.csv > summary_fusion.csv
+awk '!x[$0]++' ./detail.csv > summary_detail.csv

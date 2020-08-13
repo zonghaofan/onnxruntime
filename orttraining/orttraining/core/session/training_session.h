@@ -419,6 +419,8 @@ class TrainingSession : public InferenceSession {
                                  TransformerLevel graph_optimization_level,
                                  const std::vector<std::string>& custom_list) override;
 
+  void Debug();
+
   /** Perform auto-diff to add backward graph into the model.
   @param weights_to_train a set of weights to be training.
   @param loss_function_output_name the name of the loss function's output.

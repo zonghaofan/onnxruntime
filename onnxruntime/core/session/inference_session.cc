@@ -918,6 +918,7 @@ common::Status InferenceSession::Initialize() {
     // create SessionState for subgraphs as it's needed by the transformers
     ORT_RETURN_IF_ERROR_SESSIONID_(CreateSubgraphSessionState(graph, *session_state_));
 
+
     // apply any transformations to the main graph and any subgraphs
     ORT_RETURN_IF_ERROR_SESSIONID_(TransformGraph(graph, graph_transformation_mgr_,
                                                   execution_providers_, kernel_registry_manager_,
@@ -946,6 +947,7 @@ common::Status InferenceSession::Initialize() {
                                                         session_options_));
 
     // handle any subgraphs
+    
     ORT_RETURN_IF_ERROR_SESSIONID_(InitializeSubgraphSessions(graph, *session_state_));
     session_state_->ResolveMemoryPatternFlag();
     is_inited_ = true;
@@ -980,6 +982,8 @@ common::Status InferenceSession::Initialize() {
       }
     }
   }
+
+  Debug();
 
   return status;
 }
@@ -1552,6 +1556,10 @@ void InferenceSession::AddPredefinedTransformers(GraphTransformerManager& transf
       add_transformers(level);
     }
   }
+}
+
+void InferenceSession::Debug() {
+  std::cout<<"InferenceSession"<<std::endl;
 }
 
 common::Status InferenceSession::WaitForNotification(Notification* p_executor_done, int64_t timeout_in_ms) {

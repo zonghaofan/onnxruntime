@@ -78,6 +78,10 @@ Status SetupOptimizerParams(
 
   OptimizerGraphConfig opt_graph_config{};
   opt_graph_config.use_mixed_precision = config.mixed_precision_config.has_value();
+  if (opt_graph_config.use_mixed_precision) {
+    opt_graph_config.mixed_precision_type = config.mixed_precision_config.value().mixed_precision_type;
+  }
+
   // TODO make OptimizerGraphConfig::loss_scale_input_name optional<string>
   opt_graph_config.loss_scale_input_name =
       loss_scale_input_name.has_value() ? loss_scale_input_name.value() : "";
@@ -557,6 +561,11 @@ void TrainingSession::AddPredefinedTransformers(GraphTransformerManager& transfo
       add_transformers(level);
     }
   }
+}
+
+void TrainingSession::Debug() {
+  std::cout<<"TrainingSession"<<std::endl;
+  Save(PathString("bert_running.onnx"), SaveOption::NO_RELOAD);
 }
 
 Status TrainingSession::AddGistEncoding() {

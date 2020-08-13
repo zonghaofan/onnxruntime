@@ -103,10 +103,11 @@ class TrainingRunner {
     VectorString fetch_names;
 
     bool use_mixed_precision = false;
+    MixedPrecisionDataType mixed_precision_type{MixedPrecisionDataType::FP16};
     float loss_scale = 1.0f;
-    bool use_fp16_moments = false;
-    bool use_fp16_initializer = true;
-    bool allreduce_in_fp16 = false;
+    bool use_mixed_precision_moments = false;
+    bool use_mixed_precision_initializer = true;
+    bool allreduce_in_mixed_precision_type = false;
 
     // Tensorboard configuration.
     PathString log_dir;  // Path to write Tensorboard events to.

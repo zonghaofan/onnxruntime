@@ -11,6 +11,7 @@ namespace cuda {
 
 const std::vector<MLDataType> castOpTypeConstraints{
     DataTypeImpl::GetTensorType<MLFloat16>(),
+    DataTypeImpl::GetTensorType<BFloat16>(),
     DataTypeImpl::GetTensorType<float>(),
     DataTypeImpl::GetTensorType<double>(),
     DataTypeImpl::GetTensorType<int8_t>(),
@@ -66,6 +67,7 @@ Status Cast<SrcT>::ComputeInternal(OpKernelContext* context) const {
 
   switch (to_) {
     CASE(TensorProto_DataType_FLOAT16, MLFloat16)
+    CASE(TensorProto_DataType_BFLOAT16, BFloat16)
     CASE(TensorProto_DataType_FLOAT, float)
     CASE(TensorProto_DataType_DOUBLE, double)
     CASE(TensorProto_DataType_INT8, int8_t)
@@ -92,6 +94,7 @@ Status Cast<SrcT>::ComputeInternal(OpKernelContext* context) const {
   template Status Cast<T>::ComputeInternal(OpKernelContext* context) const;
 
 SPECIALIZE_IMPL(MLFloat16)
+SPECIALIZE_IMPL(BFloat16)
 SPECIALIZE_IMPL(float)
 SPECIALIZE_IMPL(double)
 SPECIALIZE_IMPL(int8_t)

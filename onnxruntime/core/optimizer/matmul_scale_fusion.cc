@@ -46,7 +46,7 @@ optional<float> GetScalarConstantInitializer(const Graph& graph, const NodeArg& 
   float scalar;
   utils::MLTypeCallDispatcherRet<
       Status, ExtractScalarAsFloatDispatchTarget,
-      uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double>
+      uint32_t, uint64_t, int32_t, int64_t, MLFloat16, BFloat16, float, double>
       dispatcher{initializer->data_type()};
   ORT_THROW_IF_ERROR(dispatcher.Invoke(*initializer, scalar));
 

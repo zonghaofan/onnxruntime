@@ -16,7 +16,7 @@ variables:
 name: $(Date:yyyyMMdd)$(Rev:.r)
 jobs:
 - job: Linux_py_GPU_Build_Test_Release_Dockerfile
-  timeoutInMinutes: 90
+  timeoutInMinutes: 0
   workspace:
     clean: all
   pool: Linux-GPU-CUDA10

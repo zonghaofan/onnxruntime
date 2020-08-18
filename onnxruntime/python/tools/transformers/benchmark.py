@@ -69,7 +69,7 @@ MODELS = {
     # No past state inputs for GPT models.
     "gpt2": (["input_ids"], 11, False, "gpt2"),
     # Model>2GB. Need use_external_data_format=True to export it.
-    "gpt2-large": (["input_ids"], 11, True, "gpt2"),
+    "gpt2-large": (["input_ids"], 11, False, "gpt2"),
 # Transformer-XL
     "transfo-xl-wt103": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # XLNet
@@ -86,7 +86,7 @@ MODELS = {
     # no past state inputs & outputs
     "distilgpt2": (["input_ids"], 11, False, "gpt2"),
 # CTRL
-    "ctrl": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
+    "ctrl": (["input_ids"], 12, True, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # CamemBERT
     "camembert-base": (["input_ids"], 11, False, "bert"), # Partial optimized. Output tensor 0 is not close: rtol=0.0001, atol=0.0001
 # ALBERT
@@ -384,6 +384,8 @@ def parse_arguments():
     parser.add_argument("--thread_num", required=False, type=int, default=-1, help="Threads to use")
 
     args = parser.parse_args()
+    #args = parser.parse_args(["-m", "xlnet-base-cased", "-i", "1", "-v", "-b", "0", "--overwrite", "-f", "fusion.csv", "-c", "/home/wangye/Transformer/huggingface/onnxruntime/python/tools/transformers/cache_models", "--onnx_dir", "/home/wangye/Transformer/huggingface/onnxruntime/python/tools/transformers/onnx_models", "-o", "-p", "int8"])
+
     return args
 
 

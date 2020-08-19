@@ -15,8 +15,6 @@ from quantize_helper import QuantizeHelper
 
 logger = logging.getLogger(__name__)
 
-#########################################
-
 torch_func = {"triu": torch.triu }
 
 def triu_onnx(x, diagonal=0, out=None):
@@ -43,8 +41,6 @@ def replace_torch_functions():
 
 def restore_torch_functions():
     torch.triu = torch_func["triu"]
-
-#########################################
 
 def create_onnxruntime_input(vocab_size, batch_size, sequence_length, input_names):
     input_ids = numpy.random.randint(low=0, high=vocab_size - 1, size=(batch_size, sequence_length), dtype=numpy.int64)
@@ -273,5 +269,14 @@ def export_onnx_model(model_name, opset_version, use_external_data_format, model
             ort_model_path = get_onnx_file_path(onnx_dir, model_name, len(input_names), False, use_gpu, precision, True,
                                                 use_external_data_format)
             optimize_onnx_model_by_ort(onnx_model_path, ort_model_path, use_gpu, overwrite, model_fusion_statistics)
+
+    if '/' in model_name and use_gpu is False:
+        model_name = model_name.split('/')[-1]
+        if 'flaubert_base_uncased' in model_name:
+            model_name = 'flaubert-base-uncased'
+        if 'flaubert_base_cased' in model_name:
+            model_name = 'flaubert-base-cased'
+        if 'flaubert_small_cased' in model_name:
+            model_name = 'flaubert-small-cased'
 
     return onnx_model_path, is_valid_onnx_model, config.vocab_size, tokenizer.max_model_input_sizes[model_name]

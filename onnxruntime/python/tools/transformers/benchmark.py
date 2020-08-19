@@ -227,6 +227,14 @@ def run_pytorch(use_gpu, model_names, precision, batch_sizes, sequence_lengths, 
         config = AutoConfig.from_pretrained(model_name, torchscript=torchscript, cache_dir=cache_dir)
         model = load_pretrained_model(model_name, config=config, cache_dir=cache_dir)
         tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
+        if 'flaubert' in model_name and '/' in model_name and use_gpu is False:
+            model_name = model_name.split('/')[-1]
+        if 'flaubert_base_uncased' in model_name:
+            model_name = 'flaubert-base-uncased'
+        if 'flaubert_base_cased' in model_name:
+            model_name = 'flaubert-base-cased'
+        if 'flaubert_small_cased' in model_name:
+            model_name = 'flaubert-small-cased'
         max_input_size = tokenizer.max_model_input_sizes[model_name]
         logger.debug(f"Model {model}")
         logger.debug(f"Number of parameters {model.num_parameters()}")
@@ -384,7 +392,7 @@ def parse_arguments():
     parser.add_argument("--thread_num", required=False, type=int, default=-1, help="Threads to use")
 
     args = parser.parse_args()
-    #args = parser.parse_args(["-m", "xlnet-base-cased", "-i", "1", "-v", "-b", "0", "--overwrite", "-f", "fusion.csv", "-c", "/home/wangye/Transformer/huggingface/onnxruntime/python/tools/transformers/cache_models", "--onnx_dir", "/home/wangye/Transformer/huggingface/onnxruntime/python/tools/transformers/onnx_models", "-o", "-p", "int8"])
+    #args = parser.parse_args(["-m", "flaubert/flaubert_base_uncased", "-i", "1", "-v", "-b", "0", "--overwrite", "-f", "fusion.csv", "-c", "/home/wangye/Transformer/huggingface/onnxruntime/python/tools/transformers/cache_models", "--onnx_dir", "/home/wangye/Transformer/huggingface/onnxruntime/python/tools/transformers/onnx_models", "-o"])
 
     return args
 

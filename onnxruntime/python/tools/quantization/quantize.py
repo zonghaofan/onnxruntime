@@ -16,7 +16,7 @@ __producer__ = "onnx.quantize"
 __version__ = "0.1.0"
 onnx_domain = "ai.onnx"
 ms_domain = "com.microsoft"
-onnx_op_set_version = 11
+onnx_op_set_version = 12
 
 type_to_name = {
     1: "FLOAT",

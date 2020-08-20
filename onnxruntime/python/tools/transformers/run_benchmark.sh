@@ -22,15 +22,15 @@ run_torch=false
 run_torchscript=true
 
 # Devices to test (You can run either CPU or GPU, but not both: gpu need onnxruntime-gpu, and CPU need onnxruntime).
-run_gpu_fp32=false
+run_gpu_fp32=true
 run_gpu_fp16=false
 run_cpu_fp32=false
-run_cpu_int8=true
+run_cpu_int8=false
 
-average_over=20
+average_over=10
 # CPU takes longer time to run, only run 100 inferences to get average latency.
 if [ "$run_cpu" = true ] ; then
-  average_over=2
+  average_over=1
 fi
 
 # Enable optimizer (use script instead of OnnxRuntime for graph optimization)

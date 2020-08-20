@@ -17,20 +17,20 @@ run_cli=false
 run_install=false
 
 # Engines to test.
-run_ort=false
+run_ort=true
 run_torch=false
 run_torchscript=true
 
 # Devices to test (You can run either CPU or GPU, but not both: gpu need onnxruntime-gpu, and CPU need onnxruntime).
 run_gpu_fp32=false
 run_gpu_fp16=false
-run_cpu_fp32=true
-run_cpu_int8=false
+run_cpu_fp32=false
+run_cpu_int8=true
 
-average_over=1000
+average_over=20
 # CPU takes longer time to run, only run 100 inferences to get average latency.
 if [ "$run_cpu" = true ] ; then
-  average_over=100
+  average_over=2
 fi
 
 # Enable optimizer (use script instead of OnnxRuntime for graph optimization)
@@ -46,7 +46,7 @@ sequence_lengths="128"
 input_counts=1
 
 # Pretrained transformers models can be a subset of: bert-base-cased roberta-base gpt2 distilgpt2 distilbert-base-uncased
-models_to_test="facebook/bart-base"
+models_to_test="ctrl"
 #"bert-base-cased bert-base-uncased openai-gpt gpt2 gpt2-large transfo-xl-wt103 xlnet-base-cased xlm-mlm-ende-1024 xlm-mlm-en-2048 roberta-base distilroberta-base distilbert-base-uncased distilgpt2 ctrl camembert-base albert-base-v1 albert-base-v2 t5-base t5-small xlm-roberta-base flaubert/flaubert_base_uncased flaubert/flaubert_base_cased flaubert/flaubert_small_cased facebook/bart-base microsoft/DialoGPT-small google/reformer-enwik8 google/reformer-crime-and-punishment Helsinki-NLP/opus-mt-ROMANCE-en allenai/longformer-base-4096"
 
 # If you have mutliple GPUs, you can choose one GPU for test. Here is an example to use the second GPU:

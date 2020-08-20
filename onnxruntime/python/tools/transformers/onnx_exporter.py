@@ -278,5 +278,7 @@ def export_onnx_model(model_name, opset_version, use_external_data_format, model
             model_name = 'flaubert-base-cased'
         if 'flaubert_small_cased' in model_name:
             model_name = 'flaubert-small-cased'
-
+    if 'DialoGPT' in model_name:
+        model_name = 'gpt2'
+    print(tokenizer.max_model_input_sizes)
     return onnx_model_path, is_valid_onnx_model, config.vocab_size, tokenizer.max_model_input_sizes[model_name]

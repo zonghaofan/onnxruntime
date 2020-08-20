@@ -105,7 +105,7 @@ MODELS = {
 # Bart
     "facebook/bart-base": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # DialoGPT
-    "DialoGPT-small": (["input_ids"], 11, False, "bert"), # Can't load config for 'DialoGPT-medium'
+    "DialoGPT-small": (["input_ids"], 11, False, "gpt2"), # Can't load config for 'DialoGPT-medium'
     "microsoft/DialoGPT-small": (["input_ids"], 11, False, "bert"), # KeyError: 'microsoft/DialoGPT-small'
 # Reformer
     "reformer-enwik8": (["input_ids"], 11, False, "bert"), # Can't load config for 'reformer-enwik8'
@@ -227,15 +227,21 @@ def run_pytorch(use_gpu, model_names, precision, batch_sizes, sequence_lengths, 
         config = AutoConfig.from_pretrained(model_name, torchscript=torchscript, cache_dir=cache_dir)
         model = load_pretrained_model(model_name, config=config, cache_dir=cache_dir)
         tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
-        if 'flaubert' in model_name and '/' in model_name and use_gpu is False:
+        model_name1 = model_name
+        if 'flaubert' in model_name or 'DialoGPT' in model_name in model_name and use_gpu is False:
             model_name = model_name.split('/')[-1]
-        if 'flaubert_base_uncased' in model_name:
-            model_name = 'flaubert-base-uncased'
-        if 'flaubert_base_cased' in model_name:
-            model_name = 'flaubert-base-cased'
-        if 'flaubert_small_cased' in model_name:
-            model_name = 'flaubert-small-cased'
-        max_input_size = tokenizer.max_model_input_sizes[model_name]
+            if 'flaubert_base_uncased' in model_name:
+                model_name1 = 'flaubert-base-uncased'
+            if 'flaubert_base_cased' in model_name:
+                model_name1 = 'flaubert-base-cased'
+            if 'flaubert_small_cased' in model_name:
+                model_name1 = 'flaubert-small-cased'
+        if 'DialoGPT' in model_name:
+            model_name1 = 'gpt2'
+        #if 'Helsinki-NLP/opus-mt-ROMANCE-en' in model_name:
+        #    model_name1 = 'opus-mt-ROMANCE-en'
+        print(tokenizer.max_model_input_sizes)
+        max_input_size = tokenizer.max_model_input_sizes[model_name1]
         logger.debug(f"Model {model}")
         logger.debug(f"Number of parameters {model.num_parameters()}")
 

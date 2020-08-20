@@ -18,6 +18,16 @@ ONNX_OPERATOR_VERSIONED_KERNEL_EX(Concat,
 ONNX_OPERATOR_KERNEL_EX(Concat,
                         kOnnxDomain,
                         11,
+                        12,
+                        kCudaExecutionProvider,
+                        KernelDefBuilder()
+                            .TypeConstraint("T", DataTypeImpl::AllFixedSizeTensorTypes()),
+                        Concat);
+
+// opset 13
+ONNX_OPERATOR_KERNEL_EX(Concat,
+                        kOnnxDomain,
+                        13,
                         kCudaExecutionProvider,
                         KernelDefBuilder()
                             .TypeConstraint("T", DataTypeImpl::AllFixedSizeTensorTypes()),

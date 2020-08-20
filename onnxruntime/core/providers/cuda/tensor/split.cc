@@ -16,12 +16,13 @@ ONNX_OPERATOR_VERSIONED_KERNEL_EX(Split,
                                   Split);
 
 // explicitly supports negative axis
-ONNX_OPERATOR_KERNEL_EX(Split,
-                        kOnnxDomain,
-                        11,
-                        kCudaExecutionProvider,
-                        KernelDefBuilder().TypeConstraint("T", DataTypeImpl::AllFixedSizeTensorTypes()),
-                        Split);
+ONNX_OPERATOR_VERSIONED_KERNEL_EX(Split,
+                                  kOnnxDomain,
+                                  11,
+                                  12,
+                                  kCudaExecutionProvider,
+                                  KernelDefBuilder().TypeConstraint("T", DataTypeImpl::AllFixedSizeTensorTypes()),
+                                  Split);
 
 // explicitly supports 'split' as optional input
 ONNX_OPERATOR_KERNEL_EX(Split,

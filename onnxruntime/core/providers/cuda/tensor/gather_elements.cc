@@ -31,8 +31,6 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   // Process indices tensor
   const auto* indices_tensor = context->Input<Tensor>(1);
   const auto& indices_shape = indices_tensor->Shape();
-  const auto& indices_dims = indices_shape.GetDims();
-  const int32_t indices_rank = static_cast<int32_t>(indices_dims.size());
   const int64_t indices_size = indices_shape.Size();
 
   // Handle negative axis if any
@@ -43,6 +41,15 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   if (!status.IsOK())
     return status;
 
+  // A number of axis_blocks
+  const int64_t outer_dims_prod = input_shape.SizeToDimension(axis);
+  // Input batch size addressable by axis
+  const int64_t input_batch_size = input_shape.SizeFromDimension(axis);
+  // Block size under the axis
+  const int64_t axis_block_size = input_shape.SizeFromDimension(axis + 1);
+  // Number of output blocks (output block is axis_block_size)
+  const int64_t output_batch_size = indices_size * axis_block_size;
+
   // create output tensor
   auto* output_tensor = context->Output(0, indices_shape);
 
@@ -50,42 +57,31 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   if (indices_shape.Size() == 0)
     return Status::OK();
 
-  TensorPitches input_strides(input_dims);
-  TArray<int64_t> gpu_input_strides(input_strides);
-
-  TArray<fast_divmod> fdm_indices_strides(indices_rank);
-  TensorPitches indices_strides(indices_dims);
-  for (auto i = 0; i < indices_rank; i++) {
-    fdm_indices_strides[i] = fast_divmod(static_cast<int>(indices_strides[i]));
-  }
-
-  size_t element_size = input_tensor->DataType()->Size();
+  const size_t element_size = input_tensor->DataType()->Size();
 
   if (indices_tensor->IsDataType<int32_t>()) {
     const int32_t* indices_data = indices_tensor->template Data<int32_t>();
     GatherElementsImpl<int32_t>(
-        input_rank,
         input_tensor->DataRaw(),
-        input_dims[axis],
-        gpu_input_strides,
+        outer_dims_prod,
+        axis_block_size,
+        input_batch_size,
+        output_batch_size,
         indices_data,
         indices_size,
-        fdm_indices_strides,
-        axis,
         output_tensor->MutableDataRaw(),
         element_size);
     return Status::OK();
   } else if (indices_tensor->IsDataType<int64_t>()) {
     const int64_t* indices_data = indices_tensor->template Data<int64_t>();
     GatherElementsImpl<int64_t>(
-        input_rank,
         input_tensor->DataRaw(),
-        input_dims[axis],
-        gpu_input_strides,
+        outer_dims_prod,
+        axis_block_size,
+        input_batch_size,
+        output_batch_size,
         indices_data,
         indices_size,
-        fdm_indices_strides,
-        axis,
         output_tensor->MutableDataRaw(),
         element_size);
     return Status::OK();

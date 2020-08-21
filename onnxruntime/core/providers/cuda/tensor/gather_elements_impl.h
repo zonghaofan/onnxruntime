@@ -11,14 +11,13 @@ namespace cuda {
 
 template <typename Tin>
 void GatherElementsImpl(
-    const int64_t rank,  // both inputs have same rank and this is validated in the main Compute
     const void* input_data,
-    const int64_t input_dim_along_axis,
-    const TArray<int64_t>& input_strides,
+    const int64_t outer_dims_prod,
+    const int64_t axis_block_size,
+    const int64_t input_batch_size,
+    const int64_t output_batch_size,
     const Tin* indices_data,
     const int64_t indices_size,
-    const TArray<fast_divmod>& indices_strides,
-    const int64_t axis,
     void* output_data,
     size_t element_size);
 

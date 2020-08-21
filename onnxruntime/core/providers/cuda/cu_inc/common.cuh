@@ -237,6 +237,7 @@ static INT CeilDiv(INT a, INT2 b)  // ceil(a/b)
 
 struct GridDim {
   enum : CUDA_LONG {
+    maxThreadBlocks = 2048,    // Max blocks per grid
     maxThreadsPerBlock = 256,  // max threads per block
     maxElementsPerThread = 4,  // max element processed per thread
   };

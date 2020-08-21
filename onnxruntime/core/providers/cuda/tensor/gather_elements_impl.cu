@@ -20,13 +20,15 @@ __global__ void _GatherElementsKernel(
 
   // Total threads we are trying to utilize is indices_size * axis_block_size
   // So each thread will be hoping through the grid and handle its own offset there
-  // which is threadIdx.x
+  // which is threadIdx.x. 
+  // Essentially, blockIdx.x * blockDim.x == outer_dims_prod
+  // threadIdx.x is within the range of [0, indices_size * axis_block_size)
   const auto start_item = blockIdx.x * blockDim.x + threadIdx.x;
   // Number of items to output
   const auto items_to_process = outer_dims_prod * indices_size * axis_block_size;
   for (auto item_num = start_item; start_item < items_to_process; item_num += blockIdx.x * blockDim.x) {
     // Batch index both for input and output although their sizes are different
-    // the addressable number is the same as we use the same number of indices
+    // the addressable number is the same as we use same dims before the axis
     const auto batch_index = item_num / axis_block_size / indices_size;
     // output_batch_index is the same as indices and output have same dims
     const auto output_block_index = item_num / axis_block_size % indices_size;
@@ -58,7 +60,7 @@ void GatherElementsImpl(
     // In the output we subst it to outer_dims_prod * indices_size * axis_block_size
     // Each thread processes a block of indices_size * axis_block_size and the number of 
     // blocks is outer_dims_prod
-    const int blocksPerGrid = static_cast<int>(outer_dims_prod);
+    const int blocksPerGrid = static_cast<int>(std::min<int64_t>(outer_dims_prod, GridDim::maxThreadBlocks));
     const auto num_threads_per_block = static_cast<int>(std::min<int64_t>((indices_size * axis_block_size), GridDim::maxThreadsPerBlock));
 
     switch (element_size) {

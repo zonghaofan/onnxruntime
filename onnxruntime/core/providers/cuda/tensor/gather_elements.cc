@@ -31,7 +31,6 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   // Process indices tensor
   const auto* indices_tensor = context->Input<Tensor>(1);
   const auto& indices_shape = indices_tensor->Shape();
-  const int64_t indices_size = indices_shape.Size();
 
   // Handle negative axis if any
   const int64_t axis = static_cast<int64_t>(HandleNegativeAxis(axis_, input_rank));
@@ -41,14 +40,17 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   if (!status.IsOK())
     return status;
 
-  // A number of axis_blocks
-  const int64_t outer_dims_prod = input_shape.SizeToDimension(axis);
+  const int64_t indices_size = indices_shape.Size();
+  // We iterate using index outer_dims. It is guaranteed not to exceed input_data dims.
+  const int64_t outer_dims_prod = indices_shape.SizeToDimension(axis);
   // Input batch size addressable by axis
   const int64_t input_batch_size = input_shape.SizeFromDimension(axis);
   // Block size under the axis
-  const int64_t axis_block_size = input_shape.SizeFromDimension(axis + 1);
+  const int64_t axis_input_block_size = input_shape.SizeFromDimension(axis + 1);
+  const int64_t axis_index_block_size = indices_shape.SizeFromDimension(axis + 1);
+
   // Number of output blocks (output block is axis_block_size)
-  const int64_t output_batch_size = indices_size * axis_block_size;
+  const int64_t output_batch_size = indices_size * axis_input_block_size;
 
   // create output tensor
   auto* output_tensor = context->Output(0, indices_shape);
@@ -64,9 +66,10 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
     GatherElementsImpl<int32_t>(
         input_tensor->DataRaw(),
         outer_dims_prod,
-        axis_block_size,
+        axis_input_block_size,
         input_batch_size,
         output_batch_size,
+        axis_index_block_size,
         indices_data,
         indices_size,
         output_tensor->MutableDataRaw(),
@@ -77,9 +80,10 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
     GatherElementsImpl<int64_t>(
         input_tensor->DataRaw(),
         outer_dims_prod,
-        axis_block_size,
+        axis_input_block_size,
         input_batch_size,
         output_batch_size,
+        axis_index_block_size,
         indices_data,
         indices_size,
         output_tensor->MutableDataRaw(),

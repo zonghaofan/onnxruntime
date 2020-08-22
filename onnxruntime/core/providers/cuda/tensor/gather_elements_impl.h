@@ -16,6 +16,7 @@ void GatherElementsImpl(
     const int64_t axis_block_size,
     const int64_t input_batch_size,
     const int64_t output_batch_size,
+    const int64_t axis_index_block_size,
     const Tin* indices_data,
     const int64_t indices_size,
     void* output_data,

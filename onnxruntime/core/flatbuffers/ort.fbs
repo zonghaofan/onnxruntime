@@ -139,7 +139,7 @@ table Attribute{
 
   f:float;
   i:long;
-  s:[ubyte];
+  s:string;
   t:Tensor;
   g:Graph;
 

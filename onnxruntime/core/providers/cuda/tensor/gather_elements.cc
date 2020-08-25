@@ -40,17 +40,17 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   if (!status.IsOK())
     return status;
 
+  const int64_t input_size = input_shape.Size();
   const int64_t indices_size = indices_shape.Size();
   // We iterate using index outer_dims. It is guaranteed not to exceed input_data dims.
-  const int64_t outer_dims_prod = indices_shape.SizeToDimension(axis);
+  const int64_t input_outer_dims_prod = input_shape.SizeToDimension(axis);
   // Input batch size addressable by axis
   const int64_t input_batch_size = input_shape.SizeFromDimension(axis);
+  const int64_t output_batch_size = indices_shape.SizeFromDimension(axis);
+  const int64_t axis_input_dim_value = input_shape[axis];
   // Block size under the axis
   const int64_t axis_input_block_size = input_shape.SizeFromDimension(axis + 1);
   const int64_t axis_index_block_size = indices_shape.SizeFromDimension(axis + 1);
-
-  // Number of output blocks (output block is axis_block_size)
-  const int64_t output_batch_size = indices_size * axis_input_block_size;
 
   // create output tensor
   auto* output_tensor = context->Output(0, indices_shape);
@@ -59,35 +59,41 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   if (indices_shape.Size() == 0)
     return Status::OK();
 
-  const size_t element_size = input_tensor->DataType()->Size();
+  // CPU algo test ONLY!
+  const void* input_data = input_tensor->DataRaw();
+  void* output_data = output_tensor->MutableDataRaw();
+  std::unique_ptr<char[]> input_cpu(new char[input_tensor->SizeInBytes()]);
+  CUDA_RETURN_IF_ERROR(cudaMemcpy(input_cpu.get(), input_data, input_tensor->SizeInBytes(),
+                                    cudaMemcpyDeviceToHost));
+  std::unique_ptr<char[]> index_cpu(new char[indices_tensor->SizeInBytes()]);
+  CUDA_RETURN_IF_ERROR(cudaMemcpy(index_cpu.get(), indices_tensor->DataRaw(), indices_tensor->SizeInBytes(),
+                                  cudaMemcpyDeviceToHost));
 
-  if (indices_tensor->IsDataType<int32_t>()) {
-    const int32_t* indices_data = indices_tensor->template Data<int32_t>();
-    GatherElementsImpl<int32_t>(
-        input_tensor->DataRaw(),
-        outer_dims_prod,
+    // Create output on CPU
+  std::unique_ptr<char[]> output_cpu(new char[output_tensor->SizeInBytes()]);
+
+  const size_t element_size = input_tensor->DataType()->Size();
+  const size_t index_element_size = indices_tensor->DataType()->Size();
+
+  if (indices_tensor->IsDataType<int32_t>() ||
+      indices_tensor->IsDataType<int64_t>()) {
+    GatherElementsImpl(
+        input_cpu.get(),
+        axis_index_block_size,
         axis_input_block_size,
+        axis_input_dim_value,
         input_batch_size,
         output_batch_size,
-        axis_index_block_size,
-        indices_data,
+        index_cpu.get(),
         indices_size,
-        output_tensor->MutableDataRaw(),
+        index_element_size,
+        output_cpu.get(),
         element_size);
-    return Status::OK();
-  } else if (indices_tensor->IsDataType<int64_t>()) {
-    const int64_t* indices_data = indices_tensor->template Data<int64_t>();
-    GatherElementsImpl<int64_t>(
-        input_tensor->DataRaw(),
-        outer_dims_prod,
-        axis_input_block_size,
-        input_batch_size,
-        output_batch_size,
-        axis_index_block_size,
-        indices_data,
-        indices_size,
-        output_tensor->MutableDataRaw(),
-        element_size);
+
+    // CPU algo test ONLY!
+    // Copy data back to GPU for test
+    CUDA_RETURN_IF_ERROR(cudaMemcpy(output_data, output_cpu.get(), output_tensor->SizeInBytes(),
+                                      cudaMemcpyHostToDevice));
     return Status::OK();
   } else {
     return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "GatherElements op: Type of 'indices' must be int32 or int64");

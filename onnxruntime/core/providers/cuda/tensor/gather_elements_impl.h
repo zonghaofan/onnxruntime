@@ -9,16 +9,16 @@
 namespace onnxruntime {
 namespace cuda {
 
-template <typename Tin>
 void GatherElementsImpl(
     const void* input_data,
-    const int64_t outer_dims_prod,
-    const int64_t axis_block_size,
+    const int64_t axis_index_block_size,
+    const int64_t axis_input_block_size,
+    const int64_t axis_input_dim_value,
     const int64_t input_batch_size,
     const int64_t output_batch_size,
-    const int64_t axis_index_block_size,
-    const Tin* indices_data,
+    const void* indices_data,
     const int64_t indices_size,
+    size_t index_element_size,
     void* output_data,
     size_t element_size);
 

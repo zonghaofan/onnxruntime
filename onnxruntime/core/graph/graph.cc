@@ -46,6 +46,44 @@ namespace onnxruntime {
     GraphProtoSyncNeeded(sync_needed);               \
   } while (0)
 
+static Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                      const TensorProto& initializer,
+                                      flatbuffers::Offset<fbs::Tensor>& fbs_tensor) {
+  auto name = builder.CreateString(initializer.name());
+  auto doc_string = builder.CreateString(initializer.doc_string());
+  std::vector<int64_t> dims_data(initializer.dims().size());
+  std::copy(initializer.dims().cbegin(), initializer.dims().cend(), dims_data.begin());
+  auto dims = builder.CreateVector(dims_data);
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> string_data;
+  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> raw_data;
+
+  auto src_type = initializer.data_type();
+  bool has_string_data = src_type == ONNX_NAMESPACE::TensorProto_DataType_STRING;
+  if (has_string_data) {
+    std::vector<std::string> string_data_vec(initializer.string_data().size());
+    std::copy(initializer.string_data().cbegin(), initializer.string_data().cend(), string_data_vec.begin());
+    string_data = builder.CreateVectorOfStrings(string_data_vec);
+  } else {
+    std::unique_ptr<uint8_t[]> unpacked_tensor;
+    size_t tensor_byte_size;
+    ORT_RETURN_IF_ERROR(
+        utils::UnpackInitializerData(initializer, unpacked_tensor, tensor_byte_size));
+    raw_data = builder.CreateVector(unpacked_tensor.get(), tensor_byte_size);
+  }
+
+  fbs::TensorBuilder tb(builder);
+  tb.add_name(name);
+  tb.add_doc_string(doc_string);
+  tb.add_dims(dims);
+  tb.add_data_type(static_cast<fbs::TensorDataType>(src_type));
+  if (has_string_data)
+    tb.add_string_data(string_data);
+  else
+    tb.add_raw_data(raw_data);
+  fbs_tensor = tb.Finish();
+  return Status::OK();
+}
+
 static bool UsingLatestOnnxOpset(const DomainToVersionMap& opset_versions) {
   bool is_latest_opset = false;
   auto onnx_opset = opset_versions.find(kOnnxDomain);
@@ -462,8 +500,85 @@ void Node::ToProto(NodeProto& proto, bool update_subgraphs) const {
   }
 }
 
-common::Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                     flatbuffers::Offset<fbs::Node>& fbs_node) const {
+#define GET_FBS_ATTR(BUILDER, TYPE, DATA_NAME, DATA) \
+  fbs::AttributeBuilder attr_builder(BUILDER);       \
+  attr_builder.add_name(name);                       \
+  attr_builder.add_doc_string(doc_string);           \
+  attr_builder.add_type(TYPE);                       \
+  attr_builder.add_##DATA_NAME(DATA);                \
+  fbs_attr = attr_builder.Finish();                  \
+  return Status::OK();
+
+#define GET_DATA_VEC(TYPE, NAME, SRC_DATA) \
+  std::vector<TYPE> NAME(SRC_DATA.size()); \
+  std::copy(SRC_DATA.cbegin(), SRC_DATA.cend(), NAME.begin());
+
+Status GetAttributeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                             const AttributeProto& attr_proto,
+                             flatbuffers::Offset<fbs::Attribute>& fbs_attr,
+                             const Graph* graph = nullptr) {
+  auto name = builder.CreateString(attr_proto.name());
+  auto doc_string = builder.CreateString(attr_proto.doc_string());
+  auto type = static_cast<fbs::AttributeType>(attr_proto.type());
+  switch (type) {
+    case fbs::AttributeType_FLOAT: {
+      GET_FBS_ATTR(builder, type, f, attr_proto.f());
+    } break;
+    case fbs::AttributeType_INT: {
+      GET_FBS_ATTR(builder, type, i, attr_proto.i());
+    } break;
+    case fbs::AttributeType_STRING: {
+      auto s = builder.CreateString(attr_proto.s());
+      GET_FBS_ATTR(builder, type, s, s);
+    } break;
+    case fbs::AttributeType_TENSOR: {
+      flatbuffers::Offset<fbs::Tensor> fbs_tensor;
+      ORT_RETURN_IF_ERROR(GetInitializerOrtFormat(builder, attr_proto.t(), fbs_tensor));
+      GET_FBS_ATTR(builder, type, t, fbs_tensor);
+    } break;
+    case fbs::AttributeType_GRAPH: {
+      ORT_RETURN_IF_NOT(!graph, "GetAttributeOrtFormat, graph is null");
+      flatbuffers::Offset<fbs::Graph> fbs_graph;
+      ORT_RETURN_IF_ERROR(graph->SaveToOrtFormat(builder, fbs_graph));
+      GET_FBS_ATTR(builder, type, g, fbs_graph);
+    } break;
+    case fbs::AttributeType_FLOATS: {
+      GET_DATA_VEC(float, floats_vec_, attr_proto.floats());
+      auto floats = builder.CreateVector(floats_vec_);
+      GET_FBS_ATTR(builder, type, floats, floats);
+    } break;
+    case fbs::AttributeType_INTS: {
+      GET_DATA_VEC(int64_t, ints_vec_, attr_proto.ints());
+      auto ints = builder.CreateVector(ints_vec_);
+      GET_FBS_ATTR(builder, type, ints, ints);
+    } break;
+    case fbs::AttributeType_STRINGS: {
+      GET_DATA_VEC(std::string, strings_vec_, attr_proto.strings());
+      auto strings = builder.CreateVectorOfStrings(strings_vec_);
+      GET_FBS_ATTR(builder, type, strings, strings);
+    } break;
+    case fbs::AttributeType_TENSORS: {
+      std::vector<flatbuffers::Offset<fbs::Tensor>> fbs_tensors_vec;
+      fbs_tensors_vec.reserve(attr_proto.tensors().size());
+      for (const auto& tensor : attr_proto.tensors()) {
+        flatbuffers::Offset<fbs::Tensor> fbs_tensor;
+        ORT_RETURN_IF_ERROR(GetInitializerOrtFormat(builder, tensor, fbs_tensor));
+        fbs_tensors_vec.push_back(fbs_tensor);
+      }
+      auto tensors = builder.CreateVector(fbs_tensors_vec);
+      GET_FBS_ATTR(builder, type, tensors, tensors);
+    } break;
+    default:
+      break;
+  }
+
+  return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "GetAttributeOrtFormat - Unsupported type: ", type);
+}
+
+#undef GET_FBS_ATTR
+
+Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                             flatbuffers::Offset<fbs::Node>& fbs_node) const {
   // if type is Primitive it's an ONNX function and currently we have kernel implementations for all those
   if (func_body_ != nullptr && node_type_ != Type::Primitive) {
     return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Serialization of fused function body is not currently supported");
@@ -488,6 +603,25 @@ common::Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   auto input_arg_counts = builder.CreateVector(definitions_.input_arg_count);
   auto implicit_inputs = GetNodeArgsOrtFormat(definitions_.implicit_input_defs);
 
+  // Node attributes
+  std::vector<flatbuffers::Offset<fbs::Attribute>> attributes_vec;
+  attributes_vec.reserve(attributes_.size());
+  for (const auto& entry : attributes_) {
+    const auto& attr_name = entry.first;
+    const auto& attr_proto = entry.second;
+    flatbuffers::Offset<fbs::Attribute> fbs_attr;
+    Graph* graph = nullptr;
+    if (attr_proto.has_g()) {
+      const auto it = attr_to_subgraph_map_.find(attr_name);
+      ORT_RETURN_IF_NOT(it != attr_to_subgraph_map_.cend(),
+                        "attr_to_subgraph_map_ does not have the graph for key ", attr_name);
+      graph = it->second;
+    }
+    ORT_RETURN_IF_ERROR(GetAttributeOrtFormat(builder, attr_proto, fbs_attr, graph));
+    attributes_vec.push_back(fbs_attr);
+  }
+  auto attributes = builder.CreateVector(attributes_vec);
+
   fbs::NodeBuilder nb(builder);
   nb.add_name(name);
   nb.add_doc_string(doc_string);
@@ -499,7 +633,7 @@ common::Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   nb.add_execution_provider_type(ep);
   nb.add_inputs(inputs);
   nb.add_outputs(outputs);
-  // attribute
+  nb.add_attributes(attributes);
   nb.add_input_arg_counts(input_arg_counts);
   nb.add_implicit_inputs(implicit_inputs);
   fbs_node = nb.Finish();
@@ -2558,92 +2692,6 @@ std::string Graph::GenerateNodeArgName(const std::string& base_name) {
 
   generated_node_arg_names_.insert(new_name);
   return new_name;
-}
-
-// TODO, move this to a shared location
-#define CASE_UNPACK(TYPE, ELEMENT_TYPE, DATA_SIZE)                              \
-  case ONNX_NAMESPACE::TensorProto_DataType::TensorProto_DataType_##TYPE: {     \
-    size_t element_count = 0;                                                   \
-    if (initializer.has_raw_data()) {                                           \
-      tensor_byte_size = initializer.raw_data().size();                         \
-      element_count = tensor_byte_size / sizeof(ELEMENT_TYPE);                  \
-    } else {                                                                    \
-      element_count = initializer.DATA_SIZE();                                  \
-      tensor_byte_size = element_count * sizeof(ELEMENT_TYPE);                  \
-    }                                                                           \
-    unpacked_tensor.reset(new uint8_t[tensor_byte_size]);                       \
-    return onnxruntime::utils::UnpackTensor(                                    \
-        initializer,                                                            \
-        initializer.has_raw_data() ? initializer.raw_data().data() : nullptr,   \
-        initializer.has_raw_data() ? initializer.raw_data().size() : 0,         \
-        reinterpret_cast<ELEMENT_TYPE*>(unpacked_tensor.get()), element_count); \
-    break;                                                                      \
-  }
-
-static Status UnpackInitializerTensor(const onnx::TensorProto& initializer,
-                                      std::unique_ptr<uint8_t[]>& unpacked_tensor,
-                                      size_t& tensor_byte_size) ORT_MUST_USE_RESULT;
-static Status UnpackInitializerTensor(const onnx::TensorProto& initializer,
-                                      std::unique_ptr<uint8_t[]>& unpacked_tensor,
-                                      size_t& tensor_byte_size) {
-  switch (initializer.data_type()) {
-    CASE_UNPACK(FLOAT, float, float_data_size);
-    CASE_UNPACK(DOUBLE, double, double_data_size);
-    CASE_UNPACK(BOOL, bool, int32_data_size);
-    CASE_UNPACK(INT8, int8_t, int32_data_size);
-    CASE_UNPACK(INT16, int16_t, int32_data_size);
-    CASE_UNPACK(INT32, int32_t, int32_data_size);
-    CASE_UNPACK(INT64, int64_t, int64_data_size);
-    CASE_UNPACK(UINT8, uint8_t, int32_data_size);
-    CASE_UNPACK(UINT16, uint16_t, int32_data_size);
-    CASE_UNPACK(UINT32, uint32_t, uint64_data_size);
-    CASE_UNPACK(UINT64, uint64_t, uint64_data_size);
-    CASE_UNPACK(FLOAT16, onnxruntime::MLFloat16, int32_data_size);
-    CASE_UNPACK(BFLOAT16, onnxruntime::BFloat16, int32_data_size);
-    default:
-      break;
-  }
-  return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT,
-                         "Unsupported type: ", initializer.data_type());
-}
-#undef CASE_UNPACK
-
-Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                               const TensorProto& initializer,
-                               flatbuffers::Offset<fbs::Tensor>& fbs_tensor) {
-  auto name = builder.CreateString(initializer.name());
-  auto doc_string = builder.CreateString(initializer.doc_string());
-  std::vector<int64_t> dims_data(initializer.dims().size());
-  std::copy(initializer.dims().cbegin(), initializer.dims().cend(), dims_data.begin());
-  auto dims = builder.CreateVector(dims_data);
-  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> string_data;
-  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> raw_data;
-
-  auto src_type = initializer.data_type();
-  bool has_string_data = src_type == ONNX_NAMESPACE::TensorProto_DataType_STRING;
-  if (has_string_data) {
-    std::vector<std::string> string_data_vec(initializer.string_data().size());
-    std::copy(initializer.string_data().cbegin(), initializer.string_data().cend(), string_data_vec.begin());
-    string_data = builder.CreateVectorOfStrings(string_data_vec);
-  } else {
-    std::unique_ptr<uint8_t[]> unpacked_tensor;
-    size_t tensor_byte_size;
-    ORT_RETURN_IF_ERROR(
-        UnpackInitializerTensor(initializer, unpacked_tensor, tensor_byte_size));
-    raw_data = builder.CreateVector(unpacked_tensor.get(), tensor_byte_size);
-  }
-
-  fbs::TensorBuilder tb(builder);
-  tb.add_name(name);
-  tb.add_doc_string(doc_string);
-  tb.add_dims(dims);
-  tb.add_data_type(static_cast<fbs::TensorDataType>(src_type));
-  if (has_string_data)
-    tb.add_string_data(string_data);
-  else
-    tb.add_raw_data(raw_data);
-  fbs_tensor = tb.Finish();
-  return Status::OK();
 }
 
 Status GetTensorDimensionOrtFormat(flatbuffers::FlatBufferBuilder& builder,

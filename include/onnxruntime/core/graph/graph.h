@@ -973,6 +973,11 @@ class Graph {
     return Resolve(default_options);
   }
 
+  common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Graph>& fbs_graph) const;
+
+  common::Status LoadFromOrtFormat();
+
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
   /** Returns the Node containing the GraphProto for this Graph instance if IsSubgraph is true */
@@ -1031,11 +1036,6 @@ class Graph {
   // Add node with specified <node_proto>.
   Node& AddNode(const ONNX_NAMESPACE::NodeProto& node_proto,
                 const ArgNameToTypeMap& name_to_type);
-
-  common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Graph>& fbs_graph) const;
-
-  common::Status LoadFromOrtFormat();
 
 #endif
 

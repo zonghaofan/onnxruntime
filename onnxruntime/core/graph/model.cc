@@ -526,7 +526,7 @@ Status Model::Save(Model& model, int p_fd) {
 }
 
 common::Status Model::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                      flatbuffers::Offset<fbs::Model>& fbs_model) {
+                                      flatbuffers::Offset<fbs::Model>& fbs_model) const {
   auto producer_name = builder.CreateString(model_proto_.producer_name());
   auto producer_version = builder.CreateString(model_proto_.producer_version());
   auto domain = builder.CreateString(model_proto_.domain());

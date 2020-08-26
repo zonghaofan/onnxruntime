@@ -462,10 +462,26 @@ void Node::ToProto(NodeProto& proto, bool update_subgraphs) const {
   }
 }
 
-void Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                           flatbuffers::Offset<onnxruntime::experimental::fbs::Node> fbs_node) {
+common::Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                     flatbuffers::Offset<fbs::Node>& fbs_node) const {
   (void)builder;
   (void)fbs_node;
+  return Status::OK();
+}
+
+flatbuffers::Offset<fbs::NodeEdge> Node::GetEdgesOrtFormat(flatbuffers::FlatBufferBuilder& builder) const {
+  auto get_edges = [](const EdgeSet& edge_set) {
+    std::vector<fbs::EdgeEnd> edges;
+    edges.reserve(edge_set.size());
+    for (const auto& edge : edge_set)
+      edges.push_back(fbs::EdgeEnd(edge.GetNode().Index(), edge.GetSrcArgIndex(), edge.GetDstArgIndex()));
+
+    return edges;
+  };
+
+  const auto input_edges = get_edges(relationships_.input_edges);
+  const auto output_edges = get_edges(relationships_.output_edges);
+  return fbs::CreateNodeEdgeDirect(builder, index_, &input_edges, &output_edges);
 }
 
 void Node::Init(const std::string& name,
@@ -2556,7 +2572,7 @@ static Status UnpackInitializerTensor(const onnx::TensorProto& initializer,
 #undef CASE_UNPACK
 
 Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                               const ONNX_NAMESPACE::TensorProto& initializer,
+                               const TensorProto& initializer,
                                flatbuffers::Offset<fbs::Tensor>& fbs_tensor) {
   auto name = builder.CreateString(initializer.name());
   auto doc_string = builder.CreateString(initializer.doc_string());
@@ -2569,12 +2585,9 @@ Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   auto src_type = initializer.data_type();
   bool has_string_data = src_type == ONNX_NAMESPACE::TensorProto_DataType_STRING;
   if (has_string_data) {
-    std::vector<flatbuffers::Offset<flatbuffers::String>> string_data_vec;
-    string_data_vec.reserve(initializer.string_data().size());
-    for (const auto& s : initializer.string_data())
-      string_data_vec.push_back(builder.CreateString(s));
-
-    string_data = builder.CreateVector(string_data_vec);
+    std::vector<std::string> string_data_vec(initializer.string_data().size());
+    std::copy(initializer.string_data().cbegin(), initializer.string_data().cend(), string_data_vec.begin());
+    string_data = builder.CreateVectorOfStrings(string_data_vec);
   } else {
     std::unique_ptr<uint8_t[]> unpacked_tensor;
     size_t tensor_byte_size;
@@ -2597,63 +2610,48 @@ Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
 }
 
 Status GetTensorDimensionOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                   const onnx::TensorShapeProto_Dimension& tensor_shape_dim,
+                                   const TensorShapeProto_Dimension& tensor_shape_dim,
                                    flatbuffers::Offset<fbs::Dimension>& fbs_dim) {
   auto denotation = builder.CreateString(tensor_shape_dim.denotation());
   flatbuffers::Offset<fbs::DimensionValue> dim_val;
   if (tensor_shape_dim.has_dim_param()) {
-    auto dim_param = builder.CreateString(tensor_shape_dim.dim_param());
-    fbs::DimensionValueBuilder dvb(builder);
-    dvb.add_dim_param(dim_param);
-    dim_val = dvb.Finish();
+    dim_val = fbs::CreateDimensionValueDirect(builder, 0, tensor_shape_dim.dim_param().c_str());
   } else if (tensor_shape_dim.has_dim_value()) {
-    fbs::DimensionValueBuilder dvb(builder);
-    dvb.add_dim_value(tensor_shape_dim.dim_value());
-    dim_val = dvb.Finish();
+    dim_val = fbs::CreateDimensionValueDirect(builder, tensor_shape_dim.dim_value());
   } else {
     return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "invalid dim type");
   }
 
-  fbs::DimensionBuilder db(builder);
-  db.add_denotation(denotation);
-  db.add_value(dim_val);
-  fbs_dim = db.Finish();
+  fbs_dim = fbs::CreateDimension(builder, dim_val, denotation);
   return Status::OK();
 }
 
 Status GetTensorShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                               const onnx::TensorShapeProto& tensor_shape_proto,
+                               const TensorShapeProto& tensor_shape_proto,
                                flatbuffers::Offset<fbs::Shape>& fbs_shape) {
-  std::vector<flatbuffers::Offset<fbs::Dimension>> dim_vec;
-  dim_vec.reserve(tensor_shape_proto.dim_size());
+  std::vector<flatbuffers::Offset<fbs::Dimension>> dim;
+  dim.reserve(tensor_shape_proto.dim_size());
   for (const auto& d : tensor_shape_proto.dim()) {
     flatbuffers::Offset<fbs::Dimension> fbs_d;
     ORT_RETURN_IF_ERROR(GetTensorDimensionOrtFormat(builder, d, fbs_d));
-    dim_vec.push_back(fbs_d);
+    dim.push_back(fbs_d);
   }
-
-  auto dim = builder.CreateVector(dim_vec);
-  fbs::ShapeBuilder sb(builder);
-  sb.add_dim(dim);
-  fbs_shape = sb.Finish();
+  fbs_shape = fbs::CreateShapeDirect(builder, &dim);
   return Status::OK();
 }
 
 Status GetTensorTypeAndShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                      const onnx::TypeProto_Tensor& tensor_type_proto,
+                                      const TypeProto_Tensor& tensor_type_proto,
                                       flatbuffers::Offset<fbs::TensorTypeAndShape>& fbs_tensor_type) {
   flatbuffers::Offset<fbs::Shape> shape;
-  ORT_RETURN_IF_ERROR(
-      GetTensorShapeOrtFormat(builder, tensor_type_proto.shape(), shape));
-  fbs::TensorTypeAndShapeBuilder ttsb(builder);
-  ttsb.add_elem_type(static_cast<fbs::TensorDataType>(tensor_type_proto.elem_type()));
-  ttsb.add_shape(shape);
-  fbs_tensor_type = ttsb.Finish();
+  ORT_RETURN_IF_ERROR(GetTensorShapeOrtFormat(builder, tensor_type_proto.shape(), shape));
+  fbs_tensor_type = fbs::CreateTensorTypeAndShape(
+      builder, static_cast<fbs::TensorDataType>(tensor_type_proto.elem_type()), shape);
   return Status::OK();
 }
 
 Status GetTypeInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                            const onnx::TypeProto& type_proto,
+                            const TypeProto& type_proto,
                             flatbuffers::Offset<fbs::TypeInfo>& fbs_type_info) {
   auto denotation = builder.CreateString(type_proto.denotation());
   auto value_type = fbs::TypeInfoValue_tensor_type;
@@ -2677,7 +2675,7 @@ Status GetTypeInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
 }
 
 Status GetValueInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                             const onnx::ValueInfoProto& value_info_proto,
+                             const ValueInfoProto& value_info_proto,
                              flatbuffers::Offset<fbs::ValueInfo>& fbs_value_info) {
   auto name = builder.CreateString(value_info_proto.name());
   auto doc_string = builder.CreateString(value_info_proto.doc_string());
@@ -2698,28 +2696,23 @@ Status GetValueInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
 }
 
 flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>>
-OrtFormatAddStringVector(flatbuffers::FlatBufferBuilder& builder, std::vector<const NodeArg*>& src) {
-  std::vector<flatbuffers::Offset<flatbuffers::String>> vec;
-  vec.reserve(src.size());
-  std::for_each(src.cbegin(), src.cend(),
-                [&builder, &vec](const NodeArg* entry) {
-                  vec.push_back(builder.CreateString(entry->Name()));
-                });
-  return builder.CreateVector(vec);
+GetInputsOutputsOrtFormat(flatbuffers::FlatBufferBuilder& builder, const std::vector<const NodeArg*>& src) {
+  std::vector<std::string> vec(src.size());
+  std::transform(src.cbegin(), src.cend(), vec.begin(),
+                 [](const NodeArg* entry) { return entry->Name(); });
+  return builder.CreateVectorOfStrings(vec);
 }
 
 common::Status Graph::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                      flatbuffers::Offset<fbs::Graph>& fbs_graph) {
-  auto inputs = OrtFormatAddStringVector(builder, graph_inputs_including_initializers_);
-  auto outputs = OrtFormatAddStringVector(builder, graph_outputs_);
+                                      flatbuffers::Offset<fbs::Graph>& fbs_graph) const {
+  auto inputs = GetInputsOutputsOrtFormat(builder, graph_inputs_including_initializers_);
+  auto outputs = GetInputsOutputsOrtFormat(builder, graph_outputs_);
 
-  std::vector<flatbuffers::Offset<flatbuffers::String>> outer_scope_node_args_vec;
-  std::for_each(resolve_context_.outer_scope_node_args.cbegin(),
-                resolve_context_.outer_scope_node_args.cend(),
-                [&builder, &outer_scope_node_args_vec](const std::string& arg) {
-                  outer_scope_node_args_vec.push_back(builder.CreateString(arg));
-                });
-  auto outer_scope_node_args = builder.CreateVector(outer_scope_node_args_vec);
+  std::vector<std::string> outer_scope_node_args_vec(resolve_context_.outer_scope_node_args.size());
+  std::copy(resolve_context_.outer_scope_node_args.cbegin(),
+            resolve_context_.outer_scope_node_args.cend(),
+            outer_scope_node_args_vec.begin());
+  auto outer_scope_node_args = builder.CreateVectorOfStrings(outer_scope_node_args_vec);
 
   std::vector<flatbuffers::Offset<fbs::Tensor>> initializers_data;
   initializers_data.reserve(name_to_initial_tensor_.size());
@@ -2739,10 +2732,20 @@ common::Status Graph::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   }
   auto node_args = builder.CreateVector(node_args_data);
 
+  std::vector<flatbuffers::Offset<fbs::NodeEdge>> node_edges_vec;
+  node_edges_vec.reserve(nodes_.size());
+  for (const auto& node : nodes_) {
+    if (node != nullptr)
+      node_edges_vec.push_back(node->GetEdgesOrtFormat(builder));
+  }
+  auto node_edges = builder.CreateVector(node_edges_vec);
+
   fbs::GraphBuilder gb(builder);
   gb.add_initializers(initializers);
   gb.add_node_args(node_args);
+  // nodes
   gb.add_max_node_index(static_cast<uint32_t>(nodes_.size()));
+  gb.add_node_edges(node_edges);
   gb.add_inputs(inputs);
   gb.add_outputs(outputs);
   gb.add_outer_scope_node_args(outer_scope_node_args);

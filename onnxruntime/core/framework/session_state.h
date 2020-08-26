@@ -254,7 +254,7 @@ class SessionState {
   void UpdateToBeExecutedNodes(const std::vector<int>& fetch_mlvalue_idxs);
   const std::unordered_set<NodeIndex>* GetToBeExecutedNodes(const std::vector<int>& fetch_mlvalue_idxs) const;
   Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                         flatbuffers::Offset<onnxruntime::experimental::fbs::SessionState>& fbs_session_state);
+                         flatbuffers::Offset<onnxruntime::experimental::fbs::SessionState>& fbs_session_state) const;
 #endif
 
   Status FinalizeSessionState(const std::basic_string<PATH_CHAR_TYPE>& graph_loc,

@@ -671,7 +671,7 @@ Status GetSubGraphSessionStatesOrtFormat(flatbuffers::FlatBufferBuilder& builder
 }
 
 Status SessionState::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                     flatbuffers::Offset<fbs::SessionState>& fbs_session_state) {
+                                     flatbuffers::Offset<fbs::SessionState>& fbs_session_state) const {
   size_t size = kernel_create_info_map_.size();
   std::vector<uint32_t> node_indices;
   std::vector<uint64_t> kernel_def_hashes;

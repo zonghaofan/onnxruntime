@@ -370,8 +370,11 @@ class Node {
   */
   void ToProto(ONNX_NAMESPACE::NodeProto& proto, bool update_subgraphs = false) const;
 
-  void SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                       flatbuffers::Offset<onnxruntime::experimental::fbs::Node> fbs_node);
+  common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Node>& fbs_node) const;
+
+  flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>
+  GetEdgesOrtFormat(flatbuffers::FlatBufferBuilder& builder) const;
 
 #endif
 
@@ -1030,7 +1033,7 @@ class Graph {
                 const ArgNameToTypeMap& name_to_type);
 
   common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Graph>& fbs_graph);
+                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Graph>& fbs_graph) const;
 
   common::Status LoadFromOrtFormat();
 

@@ -215,7 +215,7 @@ class Model {
                              const logging::Logger& logger);
 
   common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Model>& model);
+                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Model>& model) const;
 
   common::Status LoadFromOrtFormat();
 

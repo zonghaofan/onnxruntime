@@ -28,6 +28,7 @@
 using namespace ONNX_NAMESPACE;
 using namespace onnxruntime;
 using namespace onnxruntime::common;
+using namespace onnxruntime::experimental;
 
 static constexpr int DEFAULT_PROTOBUF_BLOCK_SIZE = 4 * 1024 * 1024;
 
@@ -522,6 +523,43 @@ Status Model::Save(Model& model, int p_fd) {
     return Status::OK();
   }
   return Status(ONNXRUNTIME, INVALID_PROTOBUF, "Protobuf serialization failed.");
+}
+
+common::Status Model::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                      flatbuffers::Offset<fbs::Model>& fbs_model) {
+  auto producer_name = builder.CreateString(model_proto_.producer_name());
+  auto producer_version = builder.CreateString(model_proto_.producer_version());
+  auto domain = builder.CreateString(model_proto_.domain());
+  auto doc_string = builder.CreateString(model_proto_.doc_string());
+
+  std::vector<flatbuffers::Offset<fbs::OperatorSetId>> op_set_ids_vec;
+  op_set_ids_vec.reserve(model_proto_.opset_import().size());
+  for (const auto& entry : model_proto_.opset_import()) {
+    auto op_set_domain = builder.CreateString(entry.domain());
+    fbs::OperatorSetIdBuilder ob(builder);
+    ob.add_domain(op_set_domain);
+    ob.add_version(entry.version());
+    op_set_ids_vec.push_back(ob.Finish());
+  }
+  auto op_set_ids = builder.CreateVector(op_set_ids_vec);
+
+  flatbuffers::Offset<fbs::Graph> fbs_graph;
+  graph_->SaveToOrtFormat(builder, fbs_graph);
+
+  fbs::ModelBuilder mb(builder);
+  mb.add_ir_version(model_proto_.ir_version());
+  mb.add_opset_import(op_set_ids);
+  mb.add_producer_name(producer_name);
+  mb.add_producer_version(producer_version);
+  mb.add_domain(domain);
+  mb.add_model_version(model_proto_.model_version());
+  mb.add_doc_string(doc_string);
+  mb.add_graph(fbs_graph);
+
+  // add graph
+  fbs_model = mb.Finish();
+
+  return Status::OK();
 }
 
 #endif  // !defined(ORT_MINIMAL_BUILD)

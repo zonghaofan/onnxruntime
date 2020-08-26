@@ -8,6 +8,7 @@
 #include <climits>
 #include <string>
 #include "core/common/path.h"
+#include "core/flatbuffers/ort_generated.h"
 #include "core/graph/graph_viewer.h"
 #include "core/session/onnxruntime_c_api.h"
 #include "gsl/gsl"
@@ -212,6 +213,12 @@ class Model {
                              /*out*/ std::shared_ptr<Model>& p_model,
                              const IOnnxRuntimeOpSchemaRegistryList* local_registries,
                              const logging::Logger& logger);
+
+  common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Model>& model);
+
+  common::Status LoadFromOrtFormat();
+
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
  private:

@@ -34,6 +34,7 @@ using namespace ONNX_NAMESPACE::checker;
 using namespace ONNX_NAMESPACE;
 using namespace ONNX_NAMESPACE::Utils;
 using namespace ::onnxruntime::common;
+using namespace onnxruntime::experimental;
 
 namespace onnxruntime {
 
@@ -459,6 +460,12 @@ void Node::ToProto(NodeProto& proto, bool update_subgraphs) const {
   for (auto& output_def : definitions_.output_defs) {
     proto.add_output(output_def->Name());
   }
+}
+
+void Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                           flatbuffers::Offset<onnxruntime::experimental::fbs::Node> fbs_node) {
+  (void)builder;
+  (void)fbs_node;
 }
 
 void Node::Init(const std::string& name,
@@ -2498,6 +2505,63 @@ std::string Graph::GenerateNodeArgName(const std::string& base_name) {
 
   generated_node_arg_names_.insert(new_name);
   return new_name;
+}
+
+Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                               const onnx::TensorProto& initializer,
+                               flatbuffers::Offset<fbs::Tensor>& fbs_tensor) {
+  auto name = builder.CreateString(initializer.name());
+  auto doc_string = builder.CreateString(initializer.doc_string());
+
+  fbs::TensorBuilder tb(builder);
+  tb.add_name(name);
+  tb.add_doc_string(doc_string);
+  tb.add_data_type(static_cast<fbs::TensorDataType>(initializer.data_type()));
+  fbs_tensor = tb.Finish();
+  return Status::OK();
+}
+
+flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>>
+OrtFormatAddStringVector(flatbuffers::FlatBufferBuilder& builder, std::vector<const NodeArg*>& src) {
+  std::vector<flatbuffers::Offset<flatbuffers::String>> vec;
+  vec.reserve(src.size());
+  std::for_each(src.cbegin(), src.cend(),
+                [&builder, &vec](const NodeArg* entry) {
+                  vec.push_back(builder.CreateString(entry->Name()));
+                });
+  return builder.CreateVector(vec);
+}
+
+common::Status Graph::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                      flatbuffers::Offset<fbs::Graph>& fbs_graph) {
+  auto inputs = OrtFormatAddStringVector(builder, graph_inputs_including_initializers_);
+  auto outputs = OrtFormatAddStringVector(builder, graph_outputs_);
+
+  std::vector<flatbuffers::Offset<flatbuffers::String>> outer_scope_node_args_vec;
+  std::for_each(resolve_context_.outer_scope_node_args.cbegin(),
+                resolve_context_.outer_scope_node_args.cend(),
+                [&builder, &outer_scope_node_args_vec](const std::string& arg) {
+                  outer_scope_node_args_vec.push_back(builder.CreateString(arg));
+                });
+  auto outer_scope_node_args = builder.CreateVector(outer_scope_node_args_vec);
+
+  std::vector<flatbuffers::Offset<fbs::Tensor>> initializers_data;
+  initializers_data.reserve(name_to_initial_tensor_.size());
+  for (const auto& pair : name_to_initial_tensor_) {
+    flatbuffers::Offset<fbs::Tensor> fbs_tensor;
+    ORT_RETURN_IF_ERROR(GetInitializerOrtFormat(builder, *pair.second, fbs_tensor));
+    initializers_data.push_back(fbs_tensor);
+  }
+  auto initializers = builder.CreateVector(initializers_data);
+
+  fbs::GraphBuilder gb(builder);
+  gb.add_initializers(initializers);
+  gb.add_max_node_index(nodes_.size());
+  gb.add_inputs(inputs);
+  gb.add_outputs(outputs);
+  gb.add_outer_scope_node_args(outer_scope_node_args);
+  fbs_graph = gb.Finish();
+  return Status::OK();
 }
 
 std::string Graph::GenerateNodeName(const std::string& base_name) {

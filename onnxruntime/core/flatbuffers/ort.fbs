@@ -86,6 +86,10 @@ table Node {
 
   inputs:[string];
   outputs:[string];
+
+  input_edges:[EdgeEnd];
+  output_edges:[EdgeEnd];
+
   attributes:[onnxruntime.experimental.fbs.Attribute];
 
   input_arg_counts:[int];
@@ -157,9 +161,6 @@ table Graph{
   nodes:[Node];
   max_node_index:uint;
 
-  input_edges:[EdgeEnd];
-  output_edges:[EdgeEnd];
-
   inputs:[string];
   outputs:[string];
 
@@ -168,7 +169,7 @@ table Graph{
 
 table Model {
   ir_version:long;
-  opset_import:OperatorSetId;
+  opset_import:[OperatorSetId];
   producer_name:string;
   producer_version:string;
   domain:string;

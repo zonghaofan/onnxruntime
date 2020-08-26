@@ -39,6 +39,7 @@
 #include "core/platform/threadpool.h"
 #include "core/providers/cpu/controlflow/utils.h"
 #include "core/providers/cpu/cpu_execution_provider.h"
+#include "core/flatbuffers/ort_generated.h"
 #ifdef USE_DML  // TODO: This is necessary for the workaround in TransformGraph
 #include "core/providers/dml/DmlExecutionProvider/src/GraphTransformer.h"
 #endif
@@ -54,6 +55,7 @@
 #endif
 
 using namespace ONNX_NAMESPACE;
+using namespace onnxruntime::experimental;
 
 namespace onnxruntime {
 namespace {
@@ -412,6 +414,29 @@ common::Status InferenceSession::RegisterCustomRegistry(std::shared_ptr<CustomRe
   //    if (custom_schema_registries_.empty())
   //      custom_schema_registries_.push_back();
   custom_schema_registries_.push_back(custom_registry->GetOpschemaRegistry());
+  return Status::OK();
+}
+
+common::Status InferenceSession::SaveSessionToOrtFormat() {
+  flatbuffers::FlatBufferBuilder builder(1024);
+  auto ort_version = builder.CreateString(ORT_VERSION);
+  flatbuffers::Offset<fbs::Model> model;
+  model_->SaveToOrtFormat(builder, model);
+  fbs::InferenceSessionBuilder sb(builder);
+  sb.add_ort_version(ort_version);
+  sb.add_model(model);
+  auto session = sb.Finish();
+  builder.Finish(session);
+
+  uint8_t* buf = builder.GetBufferPointer();
+  int size = builder.GetSize();
+
+  std::ofstream file("ort.bin", std::ios::binary);
+  file.write((char*)buf, size);
+  return Status::OK();
+}
+
+common::Status InferenceSession::LoadSessionFromOrtFormat() {
   return Status::OK();
 }
 
@@ -890,16 +915,18 @@ common::Status InferenceSession::Initialize() {
                                                                         !keep_initializers));
 
 #if !defined(ORT_MINIMAL_BUILD)
-    if (!session_options_.optimized_model_filepath.empty()) {
+    if (session_options_.optimized_model_filepath.empty()) {
       // Serialize optimized ONNX model.
-      ORT_RETURN_IF_ERROR_SESSIONID_(Model::Save(*model_, session_options_.optimized_model_filepath));
-      if (session_options_.graph_optimization_level >= TransformerLevel::Level3) {
-        LOGS(*session_logger_, WARNING) << "Serializing Optimized ONNX model with Graph Optimization"
-                                           " level greater than ORT_ENABLE_EXTENDED. The generated"
-                                           " model may contain hardware and execution provider specific"
-                                           " optimizations, and should only be used in the same environment"
-                                           " the model was optimized for.";
-      }
+      SaveSessionToOrtFormat();
+
+      // ORT_RETURN_IF_ERROR_SESSIONID_(Model::Save(*model_, session_options_.optimized_model_filepath));
+      // if (session_options_.graph_optimization_level >= TransformerLevel::Level3) {
+      //   LOGS(*session_logger_, WARNING) << "Serializing Optimized ONNX model with Graph Optimization"
+      //                                      " level greater than ORT_ENABLE_EXTENDED. The generated"
+      //                                      " model may contain hardware and execution provider specific"
+      //                                      " optimizations, and should only be used in the same environment"
+      //                                      " the model was optimized for.";
+      // }
     }
 #endif  // !defined(ORT_MINIMAL_BUILD)
 

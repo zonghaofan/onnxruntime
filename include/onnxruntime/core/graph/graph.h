@@ -15,6 +15,7 @@
 #include "core/common/path.h"
 #include "core/common/status.h"
 #include "core/common/logging/logging.h"
+#include "core/flatbuffers/ort_generated.h"
 #include "core/graph/basic_types.h"
 #include "core/graph/constants.h"
 #include "core/graph/graph_nodes.h"
@@ -100,7 +101,7 @@ class Node {
   /** Gets the Node's Node::Type. */
   Node::Type NodeType() const noexcept { return node_type_; }
 
-  /** Gets the opset version that the Node's operator was first defined in. 
+  /** Gets the opset version that the Node's operator was first defined in.
   @returns Opset version. If -1 the Node's operator has not been set.
   @remarks Prefer over Op()->SinceVersion() as Op() is disabled in a minimal build
   */
@@ -111,16 +112,16 @@ class Node {
   @remarks The graph containing this node must be resolved, otherwise nullptr will be returned. */
   const ONNX_NAMESPACE::OpSchema* Op() const noexcept { return op_; }
 
-  /** 
+  /**
   Gets the function body if applicable otherwise nullptr
   @param try_init_func_body If not already intialized, initialize the function body
   (only applicable to operators which are defined as function in ONNX spec).
-  Function body can be initialized in 2 cases : 
-  1. For nodes of type "Fused" 
+  Function body can be initialized in 2 cases :
+  1. For nodes of type "Fused"
   2. For nodes which are defined as functions in ONNX spec (example: DynamicQuantizeLinear)
   For all other cases this will always return nullptr.
-  Nodes of type "Fused" are created during partitioning and the function body 
-  initialization for such nodes also happens during node creation. Therefore, 
+  Nodes of type "Fused" are created during partitioning and the function body
+  initialization for such nodes also happens during node creation. Therefore,
   initialization of function body will happen via this method only in case 2 mentioned above.
   */
   const Function* GetFunctionBody(bool try_init_func_body = true);
@@ -368,6 +369,10 @@ class Node {
                           to ensure the complete Graph is valid.
   */
   void ToProto(ONNX_NAMESPACE::NodeProto& proto, bool update_subgraphs = false) const;
+
+  void SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                       flatbuffers::Offset<onnxruntime::experimental::fbs::Node> fbs_node);
+
 #endif
 
   /**
@@ -578,9 +583,9 @@ class Graph {
   /** Returns true if an initializer value can be overridden by a graph input with the same name. */
   bool CanOverrideInitializer() const noexcept { return ir_version_ >= 4; }
 
-  /** returns the initializer's TensorProto if 'name' is an initializer, is constant and 
+  /** returns the initializer's TensorProto if 'name' is an initializer, is constant and
   cannot be overridden at runtime. If the initializer is not found or is not constant, a nullptr is returned.
-  @param check_outer_scope If true and the graph is a subgraph, 
+  @param check_outer_scope If true and the graph is a subgraph,
          check ancestor graph/s for 'name' if not found in 'graph'.
   */
   const ONNX_NAMESPACE::TensorProto* GetConstantInitializer(const std::string& name, bool check_outer_scope) const;
@@ -1023,6 +1028,11 @@ class Graph {
   // Add node with specified <node_proto>.
   Node& AddNode(const ONNX_NAMESPACE::NodeProto& node_proto,
                 const ArgNameToTypeMap& name_to_type);
+
+  common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Graph>& fbs_graph);
+
+  common::Status LoadFromOrtFormat();
 
 #endif
 

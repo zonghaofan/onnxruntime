@@ -366,7 +366,7 @@ class InferenceSession {
     */
   AllocatorPtr GetAllocator(const OrtMemoryInfo& mem_info) const;
 
-  /** 
+  /**
     *Get InferenceSession logger.
     */
   const logging::Logger* GetLogger() const { return session_logger_; };
@@ -454,7 +454,11 @@ class InferenceSession {
   bool HasLocalSchema() const {
     return !custom_schema_registries_.empty();
   }
+
+  common::Status SaveSessionToOrtFormat();
+  common::Status LoadSessionFromOrtFormat();
 #endif
+
   void InitLogger(logging::LoggingManager* logging_manager);
 
   common::Status CheckShapes(const std::string& input_name, const TensorShape& input_shape,

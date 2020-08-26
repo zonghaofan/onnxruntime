@@ -73,6 +73,12 @@ struct EdgeEnd {
   dst_arg_index:int;
 }
 
+table NodeEdge {
+  node_index:uint;
+  input_edges:[EdgeEnd];
+  output_edges:[EdgeEnd];
+}
+
 table Node {
   name:string;
   doc_string:string;
@@ -86,10 +92,6 @@ table Node {
 
   inputs:[string];
   outputs:[string];
-
-  input_edges:[EdgeEnd];
-  output_edges:[EdgeEnd];
-
   attributes:[onnxruntime.experimental.fbs.Attribute];
 
   input_arg_counts:[int];
@@ -160,6 +162,8 @@ table Graph{
   node_args:[ValueInfo];
   nodes:[Node];
   max_node_index:uint;
+
+  node_edges:[NodeEdge];
 
   inputs:[string];
   outputs:[string];

@@ -24,6 +24,9 @@ struct TensorTypeAndShapeBuilder;
 
 struct EdgeEnd;
 
+struct NodeEdge;
+struct NodeEdgeBuilder;
+
 struct Node;
 struct NodeBuilder;
 
@@ -531,6 +534,84 @@ inline flatbuffers::Offset<TensorTypeAndShape> CreateTensorTypeAndShape(
   return builder_.Finish();
 }
 
+struct NodeEdge FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef NodeEdgeBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_NODE_INDEX = 4,
+    VT_INPUT_EDGES = 6,
+    VT_OUTPUT_EDGES = 8
+  };
+  uint32_t node_index() const {
+    return GetField<uint32_t>(VT_NODE_INDEX, 0);
+  }
+  const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *input_edges() const {
+    return GetPointer<const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *>(VT_INPUT_EDGES);
+  }
+  const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *output_edges() const {
+    return GetPointer<const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *>(VT_OUTPUT_EDGES);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_NODE_INDEX) &&
+           VerifyOffset(verifier, VT_INPUT_EDGES) &&
+           verifier.VerifyVector(input_edges()) &&
+           VerifyOffset(verifier, VT_OUTPUT_EDGES) &&
+           verifier.VerifyVector(output_edges()) &&
+           verifier.EndTable();
+  }
+};
+
+struct NodeEdgeBuilder {
+  typedef NodeEdge Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_node_index(uint32_t node_index) {
+    fbb_.AddElement<uint32_t>(NodeEdge::VT_NODE_INDEX, node_index, 0);
+  }
+  void add_input_edges(flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> input_edges) {
+    fbb_.AddOffset(NodeEdge::VT_INPUT_EDGES, input_edges);
+  }
+  void add_output_edges(flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> output_edges) {
+    fbb_.AddOffset(NodeEdge::VT_OUTPUT_EDGES, output_edges);
+  }
+  explicit NodeEdgeBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  NodeEdgeBuilder &operator=(const NodeEdgeBuilder &);
+  flatbuffers::Offset<NodeEdge> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<NodeEdge>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<NodeEdge> CreateNodeEdge(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t node_index = 0,
+    flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> input_edges = 0,
+    flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> output_edges = 0) {
+  NodeEdgeBuilder builder_(_fbb);
+  builder_.add_output_edges(output_edges);
+  builder_.add_input_edges(input_edges);
+  builder_.add_node_index(node_index);
+  return builder_.Finish();
+}
+
+inline flatbuffers::Offset<NodeEdge> CreateNodeEdgeDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t node_index = 0,
+    const std::vector<onnxruntime::experimental::fbs::EdgeEnd> *input_edges = nullptr,
+    const std::vector<onnxruntime::experimental::fbs::EdgeEnd> *output_edges = nullptr) {
+  auto input_edges__ = input_edges ? _fbb.CreateVectorOfStructs<onnxruntime::experimental::fbs::EdgeEnd>(*input_edges) : 0;
+  auto output_edges__ = output_edges ? _fbb.CreateVectorOfStructs<onnxruntime::experimental::fbs::EdgeEnd>(*output_edges) : 0;
+  return onnxruntime::experimental::fbs::CreateNodeEdge(
+      _fbb,
+      node_index,
+      input_edges__,
+      output_edges__);
+}
+
 struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef NodeBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -544,11 +625,9 @@ struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_EXECUTION_PROVIDER_TYPE = 18,
     VT_INPUTS = 20,
     VT_OUTPUTS = 22,
-    VT_INPUT_EDGES = 24,
-    VT_OUTPUT_EDGES = 26,
-    VT_ATTRIBUTES = 28,
-    VT_INPUT_ARG_COUNTS = 30,
-    VT_IMPLICIT_INPUTS = 32
+    VT_ATTRIBUTES = 24,
+    VT_INPUT_ARG_COUNTS = 26,
+    VT_IMPLICIT_INPUTS = 28
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
@@ -580,12 +659,6 @@ struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>> *outputs() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>> *>(VT_OUTPUTS);
   }
-  const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *input_edges() const {
-    return GetPointer<const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *>(VT_INPUT_EDGES);
-  }
-  const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *output_edges() const {
-    return GetPointer<const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *> *>(VT_OUTPUT_EDGES);
-  }
   const flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Attribute>> *attributes() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Attribute>> *>(VT_ATTRIBUTES);
   }
@@ -616,10 +689,6 @@ struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffset(verifier, VT_OUTPUTS) &&
            verifier.VerifyVector(outputs()) &&
            verifier.VerifyVectorOfStrings(outputs()) &&
-           VerifyOffset(verifier, VT_INPUT_EDGES) &&
-           verifier.VerifyVector(input_edges()) &&
-           VerifyOffset(verifier, VT_OUTPUT_EDGES) &&
-           verifier.VerifyVector(output_edges()) &&
            VerifyOffset(verifier, VT_ATTRIBUTES) &&
            verifier.VerifyVector(attributes()) &&
            verifier.VerifyVectorOfTables(attributes()) &&
@@ -666,12 +735,6 @@ struct NodeBuilder {
   void add_outputs(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> outputs) {
     fbb_.AddOffset(Node::VT_OUTPUTS, outputs);
   }
-  void add_input_edges(flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> input_edges) {
-    fbb_.AddOffset(Node::VT_INPUT_EDGES, input_edges);
-  }
-  void add_output_edges(flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> output_edges) {
-    fbb_.AddOffset(Node::VT_OUTPUT_EDGES, output_edges);
-  }
   void add_attributes(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Attribute>>> attributes) {
     fbb_.AddOffset(Node::VT_ATTRIBUTES, attributes);
   }
@@ -705,8 +768,6 @@ inline flatbuffers::Offset<Node> CreateNode(
     flatbuffers::Offset<flatbuffers::String> execution_provider_type = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> inputs = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> outputs = 0,
-    flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> input_edges = 0,
-    flatbuffers::Offset<flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd *>> output_edges = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Attribute>>> attributes = 0,
     flatbuffers::Offset<flatbuffers::Vector<int32_t>> input_arg_counts = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> implicit_inputs = 0) {
@@ -714,8 +775,6 @@ inline flatbuffers::Offset<Node> CreateNode(
   builder_.add_implicit_inputs(implicit_inputs);
   builder_.add_input_arg_counts(input_arg_counts);
   builder_.add_attributes(attributes);
-  builder_.add_output_edges(output_edges);
-  builder_.add_input_edges(input_edges);
   builder_.add_outputs(outputs);
   builder_.add_inputs(inputs);
   builder_.add_execution_provider_type(execution_provider_type);
@@ -741,8 +800,6 @@ inline flatbuffers::Offset<Node> CreateNodeDirect(
     const char *execution_provider_type = nullptr,
     const std::vector<flatbuffers::Offset<flatbuffers::String>> *inputs = nullptr,
     const std::vector<flatbuffers::Offset<flatbuffers::String>> *outputs = nullptr,
-    const std::vector<onnxruntime::experimental::fbs::EdgeEnd> *input_edges = nullptr,
-    const std::vector<onnxruntime::experimental::fbs::EdgeEnd> *output_edges = nullptr,
     const std::vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Attribute>> *attributes = nullptr,
     const std::vector<int32_t> *input_arg_counts = nullptr,
     const std::vector<flatbuffers::Offset<flatbuffers::String>> *implicit_inputs = nullptr) {
@@ -753,8 +810,6 @@ inline flatbuffers::Offset<Node> CreateNodeDirect(
   auto execution_provider_type__ = execution_provider_type ? _fbb.CreateString(execution_provider_type) : 0;
   auto inputs__ = inputs ? _fbb.CreateVector<flatbuffers::Offset<flatbuffers::String>>(*inputs) : 0;
   auto outputs__ = outputs ? _fbb.CreateVector<flatbuffers::Offset<flatbuffers::String>>(*outputs) : 0;
-  auto input_edges__ = input_edges ? _fbb.CreateVectorOfStructs<onnxruntime::experimental::fbs::EdgeEnd>(*input_edges) : 0;
-  auto output_edges__ = output_edges ? _fbb.CreateVectorOfStructs<onnxruntime::experimental::fbs::EdgeEnd>(*output_edges) : 0;
   auto attributes__ = attributes ? _fbb.CreateVector<flatbuffers::Offset<onnxruntime::experimental::fbs::Attribute>>(*attributes) : 0;
   auto input_arg_counts__ = input_arg_counts ? _fbb.CreateVector<int32_t>(*input_arg_counts) : 0;
   auto implicit_inputs__ = implicit_inputs ? _fbb.CreateVector<flatbuffers::Offset<flatbuffers::String>>(*implicit_inputs) : 0;
@@ -770,8 +825,6 @@ inline flatbuffers::Offset<Node> CreateNodeDirect(
       execution_provider_type__,
       inputs__,
       outputs__,
-      input_edges__,
-      output_edges__,
       attributes__,
       input_arg_counts__,
       implicit_inputs__);
@@ -1348,9 +1401,10 @@ struct Graph FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_NODE_ARGS = 6,
     VT_NODES = 8,
     VT_MAX_NODE_INDEX = 10,
-    VT_INPUTS = 12,
-    VT_OUTPUTS = 14,
-    VT_OUTER_SCOPE_NODE_ARGS = 16
+    VT_NODE_EDGES = 12,
+    VT_INPUTS = 14,
+    VT_OUTPUTS = 16,
+    VT_OUTER_SCOPE_NODE_ARGS = 18
   };
   const flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Tensor>> *initializers() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Tensor>> *>(VT_INITIALIZERS);
@@ -1363,6 +1417,9 @@ struct Graph FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   uint32_t max_node_index() const {
     return GetField<uint32_t>(VT_MAX_NODE_INDEX, 0);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>> *node_edges() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>> *>(VT_NODE_EDGES);
   }
   const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>> *inputs() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>> *>(VT_INPUTS);
@@ -1385,6 +1442,9 @@ struct Graph FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.VerifyVector(nodes()) &&
            verifier.VerifyVectorOfTables(nodes()) &&
            VerifyField<uint32_t>(verifier, VT_MAX_NODE_INDEX) &&
+           VerifyOffset(verifier, VT_NODE_EDGES) &&
+           verifier.VerifyVector(node_edges()) &&
+           verifier.VerifyVectorOfTables(node_edges()) &&
            VerifyOffset(verifier, VT_INPUTS) &&
            verifier.VerifyVector(inputs()) &&
            verifier.VerifyVectorOfStrings(inputs()) &&
@@ -1414,6 +1474,9 @@ struct GraphBuilder {
   void add_max_node_index(uint32_t max_node_index) {
     fbb_.AddElement<uint32_t>(Graph::VT_MAX_NODE_INDEX, max_node_index, 0);
   }
+  void add_node_edges(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>>> node_edges) {
+    fbb_.AddOffset(Graph::VT_NODE_EDGES, node_edges);
+  }
   void add_inputs(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> inputs) {
     fbb_.AddOffset(Graph::VT_INPUTS, inputs);
   }
@@ -1441,6 +1504,7 @@ inline flatbuffers::Offset<Graph> CreateGraph(
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::ValueInfo>>> node_args = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Node>>> nodes = 0,
     uint32_t max_node_index = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>>> node_edges = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> inputs = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> outputs = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> outer_scope_node_args = 0) {
@@ -1448,6 +1512,7 @@ inline flatbuffers::Offset<Graph> CreateGraph(
   builder_.add_outer_scope_node_args(outer_scope_node_args);
   builder_.add_outputs(outputs);
   builder_.add_inputs(inputs);
+  builder_.add_node_edges(node_edges);
   builder_.add_max_node_index(max_node_index);
   builder_.add_nodes(nodes);
   builder_.add_node_args(node_args);
@@ -1461,12 +1526,14 @@ inline flatbuffers::Offset<Graph> CreateGraphDirect(
     const std::vector<flatbuffers::Offset<onnxruntime::experimental::fbs::ValueInfo>> *node_args = nullptr,
     const std::vector<flatbuffers::Offset<onnxruntime::experimental::fbs::Node>> *nodes = nullptr,
     uint32_t max_node_index = 0,
+    const std::vector<flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>> *node_edges = nullptr,
     const std::vector<flatbuffers::Offset<flatbuffers::String>> *inputs = nullptr,
     const std::vector<flatbuffers::Offset<flatbuffers::String>> *outputs = nullptr,
     const std::vector<flatbuffers::Offset<flatbuffers::String>> *outer_scope_node_args = nullptr) {
   auto initializers__ = initializers ? _fbb.CreateVector<flatbuffers::Offset<onnxruntime::experimental::fbs::Tensor>>(*initializers) : 0;
   auto node_args__ = node_args ? _fbb.CreateVector<flatbuffers::Offset<onnxruntime::experimental::fbs::ValueInfo>>(*node_args) : 0;
   auto nodes__ = nodes ? _fbb.CreateVector<flatbuffers::Offset<onnxruntime::experimental::fbs::Node>>(*nodes) : 0;
+  auto node_edges__ = node_edges ? _fbb.CreateVector<flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>>(*node_edges) : 0;
   auto inputs__ = inputs ? _fbb.CreateVector<flatbuffers::Offset<flatbuffers::String>>(*inputs) : 0;
   auto outputs__ = outputs ? _fbb.CreateVector<flatbuffers::Offset<flatbuffers::String>>(*outputs) : 0;
   auto outer_scope_node_args__ = outer_scope_node_args ? _fbb.CreateVector<flatbuffers::Offset<flatbuffers::String>>(*outer_scope_node_args) : 0;
@@ -1476,6 +1543,7 @@ inline flatbuffers::Offset<Graph> CreateGraphDirect(
       node_args__,
       nodes__,
       max_node_index,
+      node_edges__,
       inputs__,
       outputs__,
       outer_scope_node_args__);

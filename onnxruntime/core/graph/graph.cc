@@ -464,8 +464,45 @@ void Node::ToProto(NodeProto& proto, bool update_subgraphs) const {
 
 common::Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
                                      flatbuffers::Offset<fbs::Node>& fbs_node) const {
-  (void)builder;
-  (void)fbs_node;
+  // if type is Primitive it's an ONNX function and currently we have kernel implementations for all those
+  if (func_body_ != nullptr && node_type_ != Type::Primitive) {
+    return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Serialization of fused function body is not currently supported");
+  }
+
+  auto GetNodeArgsOrtFormat = [&builder](const std::vector<NodeArg*>& src) {
+    std::vector<std::string> node_args(src.size());
+    std::transform(src.cbegin(), src.cend(), node_args.begin(),
+                   [](const NodeArg* node) {
+                     return node->Name();
+                   });
+    return builder.CreateVectorOfStrings(node_args);
+  };
+
+  auto name = builder.CreateString(name_);
+  auto doc_string = builder.CreateString(description_);
+  auto domain = builder.CreateString(domain_);
+  auto op_type = builder.CreateString(op_type_);
+  auto ep = builder.CreateString(execution_provider_type_);
+  auto inputs = GetNodeArgsOrtFormat(definitions_.input_defs);
+  auto outputs = GetNodeArgsOrtFormat(definitions_.output_defs);
+  auto input_arg_counts = builder.CreateVector(definitions_.input_arg_count);
+  auto implicit_inputs = GetNodeArgsOrtFormat(definitions_.implicit_input_defs);
+
+  fbs::NodeBuilder nb(builder);
+  nb.add_name(name);
+  nb.add_doc_string(doc_string);
+  nb.add_domain(domain);
+  nb.add_since_version(since_version_);
+  nb.add_index(index_);
+  nb.add_op_type(op_type);
+  nb.add_type(static_cast<fbs::NodeType>(node_type_));
+  nb.add_execution_provider_type(ep);
+  nb.add_inputs(inputs);
+  nb.add_outputs(outputs);
+  // attribute
+  nb.add_input_arg_counts(input_arg_counts);
+  nb.add_implicit_inputs(implicit_inputs);
+  fbs_node = nb.Finish();
   return Status::OK();
 }
 
@@ -2732,18 +2769,24 @@ common::Status Graph::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   }
   auto node_args = builder.CreateVector(node_args_data);
 
+  std::vector<flatbuffers::Offset<fbs::Node>> nodes_vec;
   std::vector<flatbuffers::Offset<fbs::NodeEdge>> node_edges_vec;
   node_edges_vec.reserve(nodes_.size());
   for (const auto& node : nodes_) {
-    if (node != nullptr)
+    if (node != nullptr) {
+      flatbuffers::Offset<fbs::Node> fbs_node;
+      ORT_RETURN_IF_ERROR(node->SaveToOrtFormat(builder, fbs_node));
+      nodes_vec.push_back(fbs_node);
       node_edges_vec.push_back(node->GetEdgesOrtFormat(builder));
+    }
   }
+  auto nodes = builder.CreateVector(nodes_vec);
   auto node_edges = builder.CreateVector(node_edges_vec);
 
   fbs::GraphBuilder gb(builder);
   gb.add_initializers(initializers);
   gb.add_node_args(node_args);
-  // nodes
+  gb.add_nodes(nodes);
   gb.add_max_node_index(static_cast<uint32_t>(nodes_.size()));
   gb.add_node_edges(node_edges);
   gb.add_inputs(inputs);

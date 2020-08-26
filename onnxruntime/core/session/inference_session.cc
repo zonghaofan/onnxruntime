@@ -417,7 +417,7 @@ common::Status InferenceSession::RegisterCustomRegistry(std::shared_ptr<CustomRe
   return Status::OK();
 }
 
-common::Status InferenceSession::SaveSessionToOrtFormat() {
+common::Status InferenceSession::SaveSessionToOrtFormat() const {
   flatbuffers::FlatBufferBuilder builder(1024);
   auto ort_version = builder.CreateString(ORT_VERSION);
   flatbuffers::Offset<fbs::Model> model;

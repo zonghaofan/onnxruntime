@@ -455,7 +455,7 @@ class InferenceSession {
     return !custom_schema_registries_.empty();
   }
 
-  common::Status SaveSessionToOrtFormat();
+  common::Status SaveSessionToOrtFormat() const;
   common::Status LoadSessionFromOrtFormat();
 #endif
 

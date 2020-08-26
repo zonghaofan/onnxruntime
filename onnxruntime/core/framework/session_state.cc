@@ -16,6 +16,7 @@
 #include "core/providers/cpu/controlflow/utils.h"
 
 using namespace ::onnxruntime::common;
+using namespace ::onnxruntime::experimental;
 
 namespace onnxruntime {
 
@@ -632,6 +633,66 @@ const std::unordered_set<NodeIndex>* SessionState::GetToBeExecutedNodes(
   auto it = to_be_executed_nodes_.find(sorted_idxs);
   return (it != to_be_executed_nodes_.end()) ? &it->second : nullptr;
 }
+
+Status GetSubGraphSessionStatesOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                         const Graph& graph,
+                                         const std::unordered_map<onnxruntime::NodeIndex, std::unordered_map<std::string, std::unique_ptr<SessionState>>>& subgraph_session_states,
+                                         std::vector<flatbuffers::Offset<fbs::SubGraphSessionState>>& fbs_subgraph_session_states) {
+  fbs_subgraph_session_states.clear();
+  if (!subgraph_session_states.empty()) {
+    std::vector<NodeIndex> sorted_node_indexes;
+    sorted_node_indexes.reserve(sorted_node_indexes.size());
+    std::transform(subgraph_session_states.cbegin(), subgraph_session_states.cend(),
+                   std::back_inserter(sorted_node_indexes),
+                   [](auto const& pair) {
+                     return pair.first;
+                   });
+    std::sort(sorted_node_indexes.begin(), sorted_node_indexes.end());
+    for (size_t i = 0; i < sorted_node_indexes.size(); i++) {
+      const NodeIndex idx = sorted_node_indexes[i];
+      const Node& node = *graph.GetNode(idx);
+      const auto& session_states = subgraph_session_states.at(idx);
+      for (const auto& name_to_subgraph_session_state : session_states) {
+        const std::string& attr_name = name_to_subgraph_session_state.first;
+        SessionState& subgraph_session_state = *name_to_subgraph_session_state.second;
+
+        auto graph_id = builder.CreateString(
+            std::to_string(i) + "_" + std::to_string(node.Index()) + "_" + attr_name);
+
+        flatbuffers::Offset<fbs::SessionState> session_state;
+        subgraph_session_state.SaveToOrtFormat(builder, session_state);
+
+        fbs_subgraph_session_states.push_back(
+            fbs::CreateSubGraphSessionState(builder, graph_id, session_state));
+      }
+    }
+  }
+  return Status::OK();
+}
+
+Status SessionState::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                     flatbuffers::Offset<fbs::SessionState>& fbs_session_state) {
+  size_t size = kernel_create_info_map_.size();
+  std::vector<uint32_t> node_indices;
+  std::vector<uint64_t> kernel_def_hashes;
+  node_indices.reserve(size);
+  kernel_def_hashes.reserve(size);
+  for (const auto& kvp : kernel_create_info_map_) {
+    node_indices.push_back(kvp.first);
+    kernel_def_hashes.push_back(kvp.second->kernel_def->GetHash());
+  }
+
+  auto kernels = fbs::CreateKernelCreateInfosDirect(builder, &node_indices, &kernel_def_hashes);
+
+  // Subgraph session states
+  std::vector<flatbuffers::Offset<fbs::SubGraphSessionState>> sub_graph_session_states;
+  ORT_RETURN_IF_ERROR(
+      GetSubGraphSessionStatesOrtFormat(builder, graph_, subgraph_session_states_, sub_graph_session_states));
+
+  fbs_session_state = fbs::CreateSessionStateDirect(builder, kernels, &sub_graph_session_states);
+  return Status::OK();
+}
+
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
 Status SessionState::CreateSubgraphSessionState() {

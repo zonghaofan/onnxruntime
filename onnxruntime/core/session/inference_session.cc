@@ -421,10 +421,17 @@ common::Status InferenceSession::SaveSessionToOrtFormat() {
   flatbuffers::FlatBufferBuilder builder(1024);
   auto ort_version = builder.CreateString(ORT_VERSION);
   flatbuffers::Offset<fbs::Model> model;
-  model_->SaveToOrtFormat(builder, model);
+  ORT_RETURN_IF_ERROR(
+      model_->SaveToOrtFormat(builder, model));
+
+  flatbuffers::Offset<fbs::SessionState> session_state;
+  ORT_RETURN_IF_ERROR(
+      session_state_->SaveToOrtFormat(builder, session_state));
+
   fbs::InferenceSessionBuilder sb(builder);
   sb.add_ort_version(ort_version);
   sb.add_model(model);
+  sb.add_session_state(session_state);
   auto session = sb.Finish();
   builder.Finish(session);
 
@@ -908,12 +915,12 @@ common::Status InferenceSession::Initialize() {
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
     // need to keep the initializers if we're going to save the optimized model
-    bool keep_initializers = !session_options_.optimized_model_filepath.empty();
+    // bool keep_initializers = !session_options_.optimized_model_filepath.empty();
+    bool keep_initializers = true;
 
     ORT_RETURN_IF_ERROR_SESSIONID_(session_state_->FinalizeSessionState(model_location_, kernel_registry_manager_,
                                                                         session_options_,
                                                                         !keep_initializers));
-
 #if !defined(ORT_MINIMAL_BUILD)
     if (session_options_.optimized_model_filepath.empty()) {
       // Serialize optimized ONNX model.

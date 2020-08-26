@@ -634,10 +634,10 @@ const std::unordered_set<NodeIndex>* SessionState::GetToBeExecutedNodes(
   return (it != to_be_executed_nodes_.end()) ? &it->second : nullptr;
 }
 
-Status GetSubGraphSessionStatesOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                         const Graph& graph,
-                                         const std::unordered_map<onnxruntime::NodeIndex, std::unordered_map<std::string, std::unique_ptr<SessionState>>>& subgraph_session_states,
-                                         std::vector<flatbuffers::Offset<fbs::SubGraphSessionState>>& fbs_subgraph_session_states) {
+static Status GetSubGraphSessionStatesOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                                const Graph& graph,
+                                                const std::unordered_map<onnxruntime::NodeIndex, std::unordered_map<std::string, std::unique_ptr<SessionState>>>& subgraph_session_states,
+                                                std::vector<flatbuffers::Offset<fbs::SubGraphSessionState>>& fbs_subgraph_session_states) {
   fbs_subgraph_session_states.clear();
   if (!subgraph_session_states.empty()) {
     std::vector<NodeIndex> sorted_node_indexes;

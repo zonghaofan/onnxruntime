@@ -512,10 +512,14 @@ void Node::ToProto(NodeProto& proto, bool update_subgraphs) const {
   std::vector<TYPE> NAME(SRC_DATA.size()); \
   std::copy(SRC_DATA.cbegin(), SRC_DATA.cend(), NAME.begin());
 
-Status GetAttributeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                             const AttributeProto& attr_proto,
-                             flatbuffers::Offset<fbs::Attribute>& fbs_attr,
-                             const Graph* graph = nullptr) {
+// Convert a given AttributeProto into fbs::Attribute
+// Note, we current do not support graphs, and sparse_tensor(s)
+//       If the attribute type is a graph, we need to use the supplied graph,
+//       instead of the GraphProto in attr_proto
+static Status GetAttributeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                    const AttributeProto& attr_proto,
+                                    flatbuffers::Offset<fbs::Attribute>& fbs_attr,
+                                    const Graph* graph = nullptr) {
   auto name = builder.CreateString(attr_proto.name());
   auto doc_string = builder.CreateString(attr_proto.doc_string());
   auto type = static_cast<fbs::AttributeType>(attr_proto.type());
@@ -2680,9 +2684,9 @@ std::string Graph::GenerateNodeArgName(const std::string& base_name) {
   return new_name;
 }
 
-Status GetTensorDimensionOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                   const TensorShapeProto_Dimension& tensor_shape_dim,
-                                   flatbuffers::Offset<fbs::Dimension>& fbs_dim) {
+static Status GetTensorDimensionOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                          const TensorShapeProto_Dimension& tensor_shape_dim,
+                                          flatbuffers::Offset<fbs::Dimension>& fbs_dim) {
   auto denotation = builder.CreateString(tensor_shape_dim.denotation());
   flatbuffers::Offset<fbs::DimensionValue> dim_val;
   if (tensor_shape_dim.has_dim_param()) {
@@ -2697,9 +2701,9 @@ Status GetTensorDimensionOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   return Status::OK();
 }
 
-Status GetTensorShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                               const TensorShapeProto& tensor_shape_proto,
-                               flatbuffers::Offset<fbs::Shape>& fbs_shape) {
+static Status GetTensorShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                      const TensorShapeProto& tensor_shape_proto,
+                                      flatbuffers::Offset<fbs::Shape>& fbs_shape) {
   std::vector<flatbuffers::Offset<fbs::Dimension>> dim;
   dim.reserve(tensor_shape_proto.dim_size());
   for (const auto& d : tensor_shape_proto.dim()) {
@@ -2711,9 +2715,9 @@ Status GetTensorShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   return Status::OK();
 }
 
-Status GetTensorTypeAndShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                      const TypeProto_Tensor& tensor_type_proto,
-                                      flatbuffers::Offset<fbs::TensorTypeAndShape>& fbs_tensor_type) {
+static Status GetTensorTypeAndShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                             const TypeProto_Tensor& tensor_type_proto,
+                                             flatbuffers::Offset<fbs::TensorTypeAndShape>& fbs_tensor_type) {
   flatbuffers::Offset<fbs::Shape> shape;
   ORT_RETURN_IF_ERROR(GetTensorShapeOrtFormat(builder, tensor_type_proto.shape(), shape));
   fbs_tensor_type = fbs::CreateTensorTypeAndShape(
@@ -2721,9 +2725,9 @@ Status GetTensorTypeAndShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   return Status::OK();
 }
 
-Status GetTypeInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                            const TypeProto& type_proto,
-                            flatbuffers::Offset<fbs::TypeInfo>& fbs_type_info) {
+static Status GetTypeInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                   const TypeProto& type_proto,
+                                   flatbuffers::Offset<fbs::TypeInfo>& fbs_type_info) {
   auto denotation = builder.CreateString(type_proto.denotation());
   auto value_type = fbs::TypeInfoValue_tensor_type;
   flatbuffers::Offset<void> value;
@@ -2745,9 +2749,9 @@ Status GetTypeInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   return Status::OK();
 }
 
-Status GetValueInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                             const ValueInfoProto& value_info_proto,
-                             flatbuffers::Offset<fbs::ValueInfo>& fbs_value_info) {
+static Status GetValueInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                                    const ValueInfoProto& value_info_proto,
+                                    flatbuffers::Offset<fbs::ValueInfo>& fbs_value_info) {
   auto name = builder.CreateString(value_info_proto.name());
   auto doc_string = builder.CreateString(value_info_proto.doc_string());
   flatbuffers::Offset<fbs::TypeInfo> type_info;
@@ -2766,7 +2770,7 @@ Status GetValueInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   return Status::OK();
 }
 
-flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>>
+static flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>>
 GetInputsOutputsOrtFormat(flatbuffers::FlatBufferBuilder& builder, const std::vector<const NodeArg*>& src) {
   std::vector<std::string> vec(src.size());
   std::transform(src.cbegin(), src.cend(), vec.begin(),

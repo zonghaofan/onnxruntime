@@ -14,7 +14,7 @@
 run_cli=false
 
 # only need once
-run_install=false
+run_install=true
 
 # Engines to test.
 run_ort=true

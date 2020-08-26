@@ -208,11 +208,17 @@ def export_onnx_model(model_name, opset_version, use_external_data_format, model
     model.cpu()
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
+
     example_inputs = tokenizer.encode_plus("This is a sample input", return_tensors="pt")
 
     example_inputs = filter_inputs(example_inputs, input_names)
 
-    example_outputs = model(**example_inputs)
+    PRETRAINED_T5_MODELS = ['t5-base', 't5-small']
+    if model_name in PRETRAINED_T5_MODELS:
+        print(input_names)
+        example_outputs = model(example_inputs[input_names[0]], decoder_input_ids=example_inputs[input_names[0]])
+    else:
+        example_outputs = model(**example_inputs)
 
     assert isinstance(example_outputs, (list, tuple)), f"type of output is not list or tuple: {type(example_outputs)}"
 
@@ -270,15 +276,17 @@ def export_onnx_model(model_name, opset_version, use_external_data_format, model
                                                 use_external_data_format)
             optimize_onnx_model_by_ort(onnx_model_path, ort_model_path, use_gpu, overwrite, model_fusion_statistics)
 
-    if '/' in model_name and use_gpu is False:
-        model_name = model_name.split('/')[-1]
-        if 'flaubert_base_uncased' in model_name:
-            model_name = 'flaubert-base-uncased'
-        if 'flaubert_base_cased' in model_name:
-            model_name = 'flaubert-base-cased'
-        if 'flaubert_small_cased' in model_name:
-            model_name = 'flaubert-small-cased'
+    #if 'flaubert' in model_name and use_gpu is False:
+    #    model_name = model_name.split('/')[-1]
+    #    if 'flaubert_base_uncased' in model_name:
+    #        model_name = 'flaubert-base-uncased'
+    #    if 'flaubert_base_cased' in model_name:
+    #        model_name = 'flaubert-base-cased'
+    #    if 'flaubert_small_cased' in model_name:
+    #        model_name = 'flaubert-small-cased'
     if 'DialoGPT' in model_name:
         model_name = 'gpt2'
+    if 'Helsinki-NLP/opus-mt-ROMANCE-en' in model_name:
+        tokenizer.max_model_input_sizes[model_name] = 512
     print(tokenizer.max_model_input_sizes)
     return onnx_model_path, is_valid_onnx_model, config.vocab_size, tokenizer.max_model_input_sizes[model_name]

@@ -69,7 +69,7 @@ MODELS = {
     # No past state inputs for GPT models.
     "gpt2": (["input_ids"], 11, False, "gpt2"),
     # Model>2GB. Need use_external_data_format=True to export it.
-    "gpt2-large": (["input_ids"], 11, False, "gpt2"),
+    "gpt2-large": (["input_ids"], 11, True, "gpt2"),
 # Transformer-XL
     "transfo-xl-wt103": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 # XLNet
@@ -238,8 +238,8 @@ def run_pytorch(use_gpu, model_names, precision, batch_sizes, sequence_lengths, 
                 model_name1 = 'flaubert-small-cased'
         if 'DialoGPT' in model_name:
             model_name1 = 'gpt2'
-        #if 'Helsinki-NLP/opus-mt-ROMANCE-en' in model_name:
-        #    model_name1 = 'opus-mt-ROMANCE-en'
+        if 'Helsinki-NLP/opus-mt-ROMANCE-en' in model_name:
+            tokenizer.max_model_input_sizes[model_name] = 512
         print(tokenizer.max_model_input_sizes)
         max_input_size = tokenizer.max_model_input_sizes[model_name1]
         logger.debug(f"Model {model}")

@@ -75,6 +75,13 @@ MODELS = {
     #"xlnet-base-cased": (["input_ids"], 12, False, "bert"),
 
     #"xlm-mlm-en-2048": (["input_ids"], 11, True, "bert"),
+    # FlauBERT
+    "flaubert/flaubert_base_uncased": (["input_ids"], 11, False, "bert"),
+    "flaubert/flaubert_base_cased": (["input_ids"], 11, False, "bert"),
+    "flaubert/flaubert_small_cased": (["input_ids"], 11, False, "bert"),
+
+    # MarianMT
+    "Helsinki-NLP/opus-mt-ROMANCE-en": (["input_ids"], 12, False, "bert"), # Exporting the operator triu to ONNX opset version 12 is not supported
 }
 
 cpu_count = psutil.cpu_count(logical=True)

@@ -515,7 +515,7 @@ common::Status Model::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   std::vector<flatbuffers::Offset<fbs::OperatorSetId>> op_set_ids_vec;
   op_set_ids_vec.reserve(model_proto_.opset_import().size());
   for (const auto& entry : model_proto_.opset_import()) {
-    auto op_set_domain = builder.CreateString(entry.domain());
+    auto op_set_domain = builder.CreateSharedString(entry.domain());
     fbs::OperatorSetIdBuilder ob(builder);
     ob.add_domain(op_set_domain);
     ob.add_version(entry.version());

@@ -126,6 +126,39 @@ inline const char *EnumNameAttributeType(AttributeType e) {
   return EnumNamesAttributeType()[index];
 }
 
+enum DimensionValueType {
+  DimensionValueType_UNKNOWN = 0,
+  DimensionValueType_VALUE = 1,
+  DimensionValueType_PARAM = 2,
+  DimensionValueType_MIN = DimensionValueType_UNKNOWN,
+  DimensionValueType_MAX = DimensionValueType_PARAM
+};
+
+inline const DimensionValueType (&EnumValuesDimensionValueType())[3] {
+  static const DimensionValueType values[] = {
+    DimensionValueType_UNKNOWN,
+    DimensionValueType_VALUE,
+    DimensionValueType_PARAM
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesDimensionValueType() {
+  static const char * const names[4] = {
+    "UNKNOWN",
+    "VALUE",
+    "PARAM",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameDimensionValueType(DimensionValueType e) {
+  if (flatbuffers::IsOutRange(e, DimensionValueType_UNKNOWN, DimensionValueType_PARAM)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesDimensionValueType()[index];
+}
+
 enum TensorDataType {
   TensorDataType_UNDEFINED = 0,
   TensorDataType_FLOAT = 1,
@@ -420,9 +453,13 @@ inline flatbuffers::Offset<Dimension> CreateDimensionDirect(
 struct DimensionValue FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef DimensionValueBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_DIM_VALUE = 4,
-    VT_DIM_PARAM = 6
+    VT_DIM_TYPE = 4,
+    VT_DIM_VALUE = 6,
+    VT_DIM_PARAM = 8
   };
+  onnxruntime::experimental::fbs::DimensionValueType dim_type() const {
+    return static_cast<onnxruntime::experimental::fbs::DimensionValueType>(GetField<int8_t>(VT_DIM_TYPE, 0));
+  }
   int64_t dim_value() const {
     return GetField<int64_t>(VT_DIM_VALUE, 0);
   }
@@ -431,6 +468,7 @@ struct DimensionValue FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<int8_t>(verifier, VT_DIM_TYPE) &&
            VerifyField<int64_t>(verifier, VT_DIM_VALUE) &&
            VerifyOffset(verifier, VT_DIM_PARAM) &&
            verifier.VerifyString(dim_param()) &&
@@ -442,6 +480,9 @@ struct DimensionValueBuilder {
   typedef DimensionValue Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
+  void add_dim_type(onnxruntime::experimental::fbs::DimensionValueType dim_type) {
+    fbb_.AddElement<int8_t>(DimensionValue::VT_DIM_TYPE, static_cast<int8_t>(dim_type), 0);
+  }
   void add_dim_value(int64_t dim_value) {
     fbb_.AddElement<int64_t>(DimensionValue::VT_DIM_VALUE, dim_value, 0);
   }
@@ -461,21 +502,25 @@ struct DimensionValueBuilder {
 
 inline flatbuffers::Offset<DimensionValue> CreateDimensionValue(
     flatbuffers::FlatBufferBuilder &_fbb,
+    onnxruntime::experimental::fbs::DimensionValueType dim_type = onnxruntime::experimental::fbs::DimensionValueType_UNKNOWN,
     int64_t dim_value = 0,
     flatbuffers::Offset<flatbuffers::String> dim_param = 0) {
   DimensionValueBuilder builder_(_fbb);
   builder_.add_dim_value(dim_value);
   builder_.add_dim_param(dim_param);
+  builder_.add_dim_type(dim_type);
   return builder_.Finish();
 }
 
 inline flatbuffers::Offset<DimensionValue> CreateDimensionValueDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
+    onnxruntime::experimental::fbs::DimensionValueType dim_type = onnxruntime::experimental::fbs::DimensionValueType_UNKNOWN,
     int64_t dim_value = 0,
     const char *dim_param = nullptr) {
   auto dim_param__ = dim_param ? _fbb.CreateString(dim_param) : 0;
   return onnxruntime::experimental::fbs::CreateDimensionValue(
       _fbb,
+      dim_type,
       dim_value,
       dim_param__);
 }
@@ -638,8 +683,8 @@ struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   int32_t since_version() const {
     return GetField<int32_t>(VT_SINCE_VERSION, 0);
   }
-  int32_t index() const {
-    return GetField<int32_t>(VT_INDEX, 0);
+  uint32_t index() const {
+    return GetField<uint32_t>(VT_INDEX, 0);
   }
   const flatbuffers::String *op_type() const {
     return GetPointer<const flatbuffers::String *>(VT_OP_TYPE);
@@ -674,7 +719,7 @@ struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffset(verifier, VT_DOMAIN) &&
            verifier.VerifyString(domain()) &&
            VerifyField<int32_t>(verifier, VT_SINCE_VERSION) &&
-           VerifyField<int32_t>(verifier, VT_INDEX) &&
+           VerifyField<uint32_t>(verifier, VT_INDEX) &&
            VerifyOffset(verifier, VT_OP_TYPE) &&
            verifier.VerifyString(op_type()) &&
            VerifyField<int32_t>(verifier, VT_TYPE) &&
@@ -714,8 +759,8 @@ struct NodeBuilder {
   void add_since_version(int32_t since_version) {
     fbb_.AddElement<int32_t>(Node::VT_SINCE_VERSION, since_version, 0);
   }
-  void add_index(int32_t index) {
-    fbb_.AddElement<int32_t>(Node::VT_INDEX, index, 0);
+  void add_index(uint32_t index) {
+    fbb_.AddElement<uint32_t>(Node::VT_INDEX, index, 0);
   }
   void add_op_type(flatbuffers::Offset<flatbuffers::String> op_type) {
     fbb_.AddOffset(Node::VT_OP_TYPE, op_type);
@@ -758,7 +803,7 @@ inline flatbuffers::Offset<Node> CreateNode(
     flatbuffers::Offset<flatbuffers::String> doc_string = 0,
     flatbuffers::Offset<flatbuffers::String> domain = 0,
     int32_t since_version = 0,
-    int32_t index = 0,
+    uint32_t index = 0,
     flatbuffers::Offset<flatbuffers::String> op_type = 0,
     onnxruntime::experimental::fbs::NodeType type = onnxruntime::experimental::fbs::NodeType_Primitive,
     flatbuffers::Offset<flatbuffers::String> execution_provider_type = 0,
@@ -790,7 +835,7 @@ inline flatbuffers::Offset<Node> CreateNodeDirect(
     const char *doc_string = nullptr,
     const char *domain = nullptr,
     int32_t since_version = 0,
-    int32_t index = 0,
+    uint32_t index = 0,
     const char *op_type = nullptr,
     onnxruntime::experimental::fbs::NodeType type = onnxruntime::experimental::fbs::NodeType_Primitive,
     const char *execution_provider_type = nullptr,

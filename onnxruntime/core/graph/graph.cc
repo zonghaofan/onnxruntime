@@ -480,9 +480,9 @@ Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
 
   auto name = builder.CreateString(name_);
   auto doc_string = builder.CreateString(description_);
-  auto domain = builder.CreateString(domain_);
-  auto op_type = builder.CreateString(op_type_);
-  auto ep = builder.CreateString(execution_provider_type_);
+  auto domain = builder.CreateSharedString(domain_);
+  auto op_type = builder.CreateSharedString(op_type_);
+  auto ep = builder.CreateSharedString(execution_provider_type_);
   auto inputs = GetNodeArgsOrtFormat(definitions_.input_defs);
   auto outputs = GetNodeArgsOrtFormat(definitions_.output_defs);
   auto input_arg_counts = builder.CreateVector(definitions_.input_arg_count);
@@ -2625,7 +2625,7 @@ common::Status Graph::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   gb.add_initializers(initializers);
   gb.add_node_args(node_args);
   gb.add_nodes(nodes);
-  gb.add_max_node_index(static_cast<uint32_t>(nodes_.size()));
+  gb.add_max_node_index(gsl::narrow_cast<uint32_t>(nodes_.size()));
   gb.add_node_edges(node_edges);
   gb.add_inputs(inputs);
   gb.add_outputs(outputs);

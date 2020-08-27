@@ -30,7 +30,14 @@ table Dimension {
   denotation:string;
 }
 
+enum DimensionValueType : int8 {
+  UNKNOWN = 0,
+  VALUE = 1,
+  PARAM = 2,
+}
+
 table DimensionValue {
+  dim_type:DimensionValueType;
   dim_value:int64;
   dim_param:string;
 }
@@ -85,7 +92,7 @@ table Node {
   domain:string;
   since_version:int32;
 
-  index:int32;
+  index:uint32;
   op_type:string;
   type:NodeType;
   execution_provider_type:string;
@@ -143,13 +150,13 @@ table Attribute{
 
   type:AttributeType;
 
-  f:float;
+  f:float32;
   i:int64;
   s:string;
   t:Tensor;
   g:Graph;
 
-  floats:[float];
+  floats:[float32];
   ints:[int64];
   strings:[string];
   tensors:[Tensor];
@@ -184,7 +191,7 @@ table Model {
 }
 
 table KernelCreateInfos {
-  node_indices:[uint];
+  node_indices:[uint32];
   kernel_def_hashes:[uint64];
 }
 

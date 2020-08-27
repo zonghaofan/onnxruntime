@@ -126,6 +126,39 @@ inline const char *EnumNameAttributeType(AttributeType e) {
   return EnumNamesAttributeType()[index];
 }
 
+enum DimensionValueType {
+  DimensionValueType_UNKNOWN = 0,
+  DimensionValueType_VALUE = 1,
+  DimensionValueType_PARAM = 2,
+  DimensionValueType_MIN = DimensionValueType_UNKNOWN,
+  DimensionValueType_MAX = DimensionValueType_PARAM
+};
+
+inline const DimensionValueType (&EnumValuesDimensionValueType())[3] {
+  static const DimensionValueType values[] = {
+    DimensionValueType_UNKNOWN,
+    DimensionValueType_VALUE,
+    DimensionValueType_PARAM
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesDimensionValueType() {
+  static const char * const names[4] = {
+    "UNKNOWN",
+    "VALUE",
+    "PARAM",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameDimensionValueType(DimensionValueType e) {
+  if (flatbuffers::IsOutRange(e, DimensionValueType_UNKNOWN, DimensionValueType_PARAM)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesDimensionValueType()[index];
+}
+
 enum TensorDataType {
   TensorDataType_UNDEFINED = 0,
   TensorDataType_FLOAT = 1,
@@ -420,9 +453,13 @@ inline flatbuffers::Offset<Dimension> CreateDimensionDirect(
 struct DimensionValue FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef DimensionValueBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_DIM_VALUE = 4,
-    VT_DIM_PARAM = 6
+    VT_DIM_TYPE = 4,
+    VT_DIM_VALUE = 6,
+    VT_DIM_PARAM = 8
   };
+  onnxruntime::experimental::fbs::DimensionValueType dim_type() const {
+    return static_cast<onnxruntime::experimental::fbs::DimensionValueType>(GetField<int8_t>(VT_DIM_TYPE, 0));
+  }
   int64_t dim_value() const {
     return GetField<int64_t>(VT_DIM_VALUE, 0);
   }
@@ -431,6 +468,7 @@ struct DimensionValue FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<int8_t>(verifier, VT_DIM_TYPE) &&
            VerifyField<int64_t>(verifier, VT_DIM_VALUE) &&
            VerifyOffset(verifier, VT_DIM_PARAM) &&
            verifier.VerifyString(dim_param()) &&
@@ -442,6 +480,9 @@ struct DimensionValueBuilder {
   typedef DimensionValue Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
+  void add_dim_type(onnxruntime::experimental::fbs::DimensionValueType dim_type) {
+    fbb_.AddElement<int8_t>(DimensionValue::VT_DIM_TYPE, static_cast<int8_t>(dim_type), 0);
+  }
   void add_dim_value(int64_t dim_value) {
     fbb_.AddElement<int64_t>(DimensionValue::VT_DIM_VALUE, dim_value, 0);
   }
@@ -462,21 +503,25 @@ struct DimensionValueBuilder {
 
 inline flatbuffers::Offset<DimensionValue> CreateDimensionValue(
     flatbuffers::FlatBufferBuilder &_fbb,
+    onnxruntime::experimental::fbs::DimensionValueType dim_type = onnxruntime::experimental::fbs::DimensionValueType_UNKNOWN,
     int64_t dim_value = 0,
     flatbuffers::Offset<flatbuffers::String> dim_param = 0) {
   DimensionValueBuilder builder_(_fbb);
   builder_.add_dim_value(dim_value);
   builder_.add_dim_param(dim_param);
+  builder_.add_dim_type(dim_type);
   return builder_.Finish();
 }
 
 inline flatbuffers::Offset<DimensionValue> CreateDimensionValueDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
+    onnxruntime::experimental::fbs::DimensionValueType dim_type = onnxruntime::experimental::fbs::DimensionValueType_UNKNOWN,
     int64_t dim_value = 0,
     const char *dim_param = nullptr) {
   auto dim_param__ = dim_param ? _fbb.CreateString(dim_param) : 0;
   return onnxruntime::experimental::fbs::CreateDimensionValue(
       _fbb,
+      dim_type,
       dim_value,
       dim_param__);
 }

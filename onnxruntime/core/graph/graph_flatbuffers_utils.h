@@ -9,11 +9,11 @@ namespace experimental {
 namespace utils {
 onnxruntime::common::Status GetValueInfoOrtFormat(flatbuffers::FlatBufferBuilder& builder,
                                                   const ONNX_NAMESPACE::ValueInfoProto& value_info_proto,
-                                                  flatbuffers::Offset<fbs::ValueInfo>& fbs_value_info);
+                                                  flatbuffers::Offset<fbs::ValueInfo>& fbs_value_info) ORT_MUST_USE_RESULT;
 
 onnxruntime::common::Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuilder& builder,
                                                     const ONNX_NAMESPACE::TensorProto& initializer,
-                                                    flatbuffers::Offset<fbs::Tensor>& fbs_tensor);
+                                                    flatbuffers::Offset<fbs::Tensor>& fbs_tensor) ORT_MUST_USE_RESULT;
 
 // Convert a given AttributeProto into fbs::Attribute
 // Note, we current do not support graphs, and sparse_tensor(s)
@@ -22,7 +22,7 @@ onnxruntime::common::Status GetInitializerOrtFormat(flatbuffers::FlatBufferBuild
 onnxruntime::common::Status GetAttributeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
                                                   const ONNX_NAMESPACE::AttributeProto& attr_proto,
                                                   flatbuffers::Offset<fbs::Attribute>& fbs_attr,
-                                                  const onnxruntime::Graph* graph);
+                                                  const onnxruntime::Graph* graph) ORT_MUST_USE_RESULT;
 }  // namespace utils
 }  // namespace experimental
 }  // namespace onnxruntime

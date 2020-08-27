@@ -635,7 +635,6 @@ const std::unordered_set<NodeIndex>* SessionState::GetToBeExecutedNodes(
 }
 
 static Status GetSubGraphSessionStatesOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                                const Graph& graph,
                                                 const std::unordered_map<onnxruntime::NodeIndex, std::unordered_map<std::string, std::unique_ptr<SessionState>>>& subgraph_session_states,
                                                 std::vector<flatbuffers::Offset<fbs::SubGraphSessionState>>& fbs_subgraph_session_states) {
   fbs_subgraph_session_states.clear();
@@ -648,16 +647,13 @@ static Status GetSubGraphSessionStatesOrtFormat(flatbuffers::FlatBufferBuilder& 
                      return pair.first;
                    });
     std::sort(sorted_node_indexes.begin(), sorted_node_indexes.end());
-    for (size_t i = 0; i < sorted_node_indexes.size(); i++) {
-      const NodeIndex idx = sorted_node_indexes[i];
-      const Node& node = *graph.GetNode(idx);
+    for (const auto& idx : sorted_node_indexes) {
       const auto& session_states = subgraph_session_states.at(idx);
       for (const auto& name_to_subgraph_session_state : session_states) {
         const std::string& attr_name = name_to_subgraph_session_state.first;
         SessionState& subgraph_session_state = *name_to_subgraph_session_state.second;
 
-        auto graph_id = builder.CreateString(
-            std::to_string(i) + "_" + std::to_string(node.Index()) + "_" + attr_name);
+        auto graph_id = builder.CreateString(std::to_string(idx) + "_" + attr_name);
 
         flatbuffers::Offset<fbs::SessionState> session_state;
         ORT_RETURN_IF_ERROR(
@@ -688,7 +684,7 @@ Status SessionState::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   // Subgraph session states
   std::vector<flatbuffers::Offset<fbs::SubGraphSessionState>> sub_graph_session_states;
   ORT_RETURN_IF_ERROR(
-      GetSubGraphSessionStatesOrtFormat(builder, graph_, subgraph_session_states_, sub_graph_session_states));
+      GetSubGraphSessionStatesOrtFormat(builder, subgraph_session_states_, sub_graph_session_states));
 
   fbs_session_state = fbs::CreateSessionStateDirect(builder, kernels, &sub_graph_session_states);
   return Status::OK();

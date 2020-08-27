@@ -480,9 +480,9 @@ Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
 
   auto name = builder.CreateString(name_);
   auto doc_string = builder.CreateString(description_);
-  auto domain = builder.CreateString(domain_);
-  auto op_type = builder.CreateString(op_type_);
-  auto ep = builder.CreateString(execution_provider_type_);
+  auto domain = builder.CreateSharedString(domain_);
+  auto op_type = builder.CreateSharedString(op_type_);
+  auto ep = builder.CreateSharedString(execution_provider_type_);
   auto inputs = GetNodeArgsOrtFormat(definitions_.input_defs);
   auto outputs = GetNodeArgsOrtFormat(definitions_.output_defs);
   auto input_arg_counts = builder.CreateVector(definitions_.input_arg_count);

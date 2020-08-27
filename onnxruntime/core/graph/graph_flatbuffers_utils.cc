@@ -12,21 +12,20 @@ namespace onnxruntime {
 namespace experimental {
 namespace utils {
 
-static Status GetTensorDimensionOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                          const TensorShapeProto_Dimension& tensor_shape_dim,
-                                          flatbuffers::Offset<fbs::Dimension>& fbs_dim) {
+static flatbuffers::Offset<fbs::Dimension> GetTensorDimensionOrtFormat(
+    flatbuffers::FlatBufferBuilder& builder,
+    const TensorShapeProto_Dimension& tensor_shape_dim) {
   auto denotation = builder.CreateString(tensor_shape_dim.denotation());
   flatbuffers::Offset<fbs::DimensionValue> dim_val;
   if (tensor_shape_dim.has_dim_param()) {
-    dim_val = fbs::CreateDimensionValueDirect(builder, 0, tensor_shape_dim.dim_param().c_str());
+    dim_val = fbs::CreateDimensionValueDirect(builder, fbs::DimensionValueType_PARAM, 0, tensor_shape_dim.dim_param().c_str());
   } else if (tensor_shape_dim.has_dim_value()) {
-    dim_val = fbs::CreateDimensionValueDirect(builder, tensor_shape_dim.dim_value());
+    dim_val = fbs::CreateDimensionValueDirect(builder, fbs::DimensionValueType_VALUE, tensor_shape_dim.dim_value());
   } else {
-    return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "invalid dim type");
+    dim_val = fbs::CreateDimensionValueDirect(builder);
   }
 
-  fbs_dim = fbs::CreateDimension(builder, dim_val, denotation);
-  return Status::OK();
+  return fbs::CreateDimension(builder, dim_val, denotation);
 }
 
 static Status GetTensorShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
@@ -35,8 +34,7 @@ static Status GetTensorShapeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   std::vector<flatbuffers::Offset<fbs::Dimension>> dim;
   dim.reserve(tensor_shape_proto.dim_size());
   for (const auto& d : tensor_shape_proto.dim()) {
-    flatbuffers::Offset<fbs::Dimension> fbs_d;
-    ORT_RETURN_IF_ERROR(GetTensorDimensionOrtFormat(builder, d, fbs_d));
+    auto fbs_d = GetTensorDimensionOrtFormat(builder, d);
     dim.push_back(fbs_d);
   }
   fbs_shape = fbs::CreateShapeDirect(builder, &dim);

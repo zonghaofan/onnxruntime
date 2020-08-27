@@ -75,15 +75,15 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
 
   // CPU algo test ONLY!
   const void* input_data = input_tensor->DataRaw();
+  const void* indices_data = indices_tensor->DataRaw();
   void* output_data = output_tensor->MutableDataRaw();
-  std::unique_ptr<char[]> input_cpu(new char[input_tensor->SizeInBytes()]);
-  CUDA_RETURN_IF_ERROR(cudaMemcpy(input_cpu.get(), input_data, input_tensor->SizeInBytes(),
-                                    cudaMemcpyDeviceToHost));
-  std::unique_ptr<char[]> index_cpu(new char[indices_tensor->SizeInBytes()]);
-  CUDA_RETURN_IF_ERROR(cudaMemcpy(index_cpu.get(), indices_tensor->DataRaw(), indices_tensor->SizeInBytes(),
-                                  cudaMemcpyDeviceToHost));
-    // Create output on CPU
-  std::unique_ptr<char[]> output_cpu(new char[output_tensor->SizeInBytes()]);
+  //std::unique_ptr<char[]> input_cpu(new char[input_tensor->SizeInBytes()]);
+  //CUDA_RETURN_IF_ERROR(cudaMemcpy(input_cpu.get(), input_data, input_tensor->SizeInBytes(),
+  //                                  cudaMemcpyDeviceToHost));
+  //std::unique_ptr<char[]> index_cpu(new char[indices_tensor->SizeInBytes()]);
+  //CUDA_RETURN_IF_ERROR(cudaMemcpy(index_cpu.get(), indices_tensor->DataRaw(), indices_tensor->SizeInBytes(),
+  //                                cudaMemcpyDeviceToHost));
+  //std::unique_ptr<char[]> output_cpu(new char[output_tensor->SizeInBytes()]);
 
   const size_t element_size = input_tensor->DataType()->Size();
   const size_t index_element_size = indices_tensor->DataType()->Size();
@@ -93,7 +93,7 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
     switch (element_size) {
       case sizeof(int8_t):
       GatherElementsImpl<int8_t>(
-          reinterpret_cast<const int8_t*>(input_cpu.get()),
+          reinterpret_cast<const int8_t*>(input_data),
           input_strides,
           indices_strides,
           axis_index_block_size,
@@ -101,14 +101,14 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
           axis_input_dim_value,
           input_batch_size,
           output_batch_size,
-          index_cpu.get(),
+          indices_data,
           indices_size,
           index_element_size,
-          reinterpret_cast<int8_t*>(output_cpu.get()));
+          reinterpret_cast<int8_t*>(output_data));
         break;
       case sizeof(int16_t):
       GatherElementsImpl<int16_t>(
-          reinterpret_cast<const int16_t*>(input_cpu.get()),
+          reinterpret_cast<const int16_t*>(input_data),
           input_strides,
           indices_strides,
           axis_index_block_size,
@@ -116,15 +116,15 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
           axis_input_dim_value,
           input_batch_size,
           output_batch_size,
-          index_cpu.get(),
+          indices_data,
           indices_size,
           index_element_size,
-          reinterpret_cast<int16_t*>(output_cpu.get()));
+          reinterpret_cast<int16_t*>(output_data));
       break;
 
     case sizeof(int32_t):
         GatherElementsImpl<int32_t>(
-            reinterpret_cast<const int32_t*>(input_cpu.get()),
+            reinterpret_cast<const int32_t*>(input_data),
             input_strides,
             indices_strides,
             axis_index_block_size,
@@ -132,15 +132,15 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
             axis_input_dim_value,
             input_batch_size,
             output_batch_size,
-            index_cpu.get(),
+            indices_data,
             indices_size,
             index_element_size,
-            reinterpret_cast<int32_t*>(output_cpu.get()));
+            reinterpret_cast<int32_t*>(output_data));
         break;
 
     case sizeof(int64_t):
       GatherElementsImpl<int64_t>(
-          reinterpret_cast<const int64_t*>(input_cpu.get()),
+          reinterpret_cast<const int64_t*>(input_data),
           input_strides,
           indices_strides,
           axis_index_block_size,
@@ -148,10 +148,10 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
           axis_input_dim_value,
           input_batch_size,
           output_batch_size,
-          index_cpu.get(),
+          indices_data,
           indices_size,
           index_element_size,
-          reinterpret_cast<int64_t*>(output_cpu.get()));
+          reinterpret_cast<int64_t*>(output_data));
       break;
 
       // Should not reach here
@@ -161,8 +161,8 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
 
      //CPU algo test ONLY!
      //Copy data back to GPU for test
-    CUDA_RETURN_IF_ERROR(cudaMemcpy(output_data, output_cpu.get(), output_tensor->SizeInBytes(),
-                                      cudaMemcpyHostToDevice));
+    //CUDA_RETURN_IF_ERROR(cudaMemcpy(output_data, output_cpu.get(), output_tensor->SizeInBytes(),
+    //                                  cudaMemcpyHostToDevice));
     return Status::OK();
   } else {
     return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "GatherElements op: Type of 'indices' must be int32 or int64");

@@ -9,16 +9,17 @@
 #define PY_ARRAY_UNIQUE_SYMBOL onnxruntime_python_ARRAY_API
 #include <numpy/arrayobject.h>
 
-#include "core/framework/data_transfer_utils.h"
-#include "core/framework/data_types_internal.h"
-#include "core/framework/tensorprotoutils.h"
-#include "core/graph/graph_viewer.h"
 #include "core/common/logging/logging.h"
 #include "core/common/logging/severity.h"
-#include "core/framework/TensorSeq.h"
+#include "core/framework/bfc_arena.h"
+#include "core/framework/data_transfer_utils.h"
+#include "core/framework/data_types_internal.h"
+#include "core/framework/kernel_registry.h"
 #include "core/framework/random_seed.h"
 #include "core/framework/session_options.h"
-#include "core/framework/bfc_arena.h"
+#include "core/framework/tensorprotoutils.h"
+#include "core/framework/TensorSeq.h"
+#include "core/graph/graph_viewer.h"
 #include "core/session/IOBinding.h"
 
 #if USE_CUDA
@@ -263,6 +264,7 @@ void AddNonTensorAsPyObj(const OrtValue& val, std::vector<py::object>& pyobjs, c
   if (val_type->IsTensorSequenceType()) {
     AddNonTensor<TensorSeq>(val, pyobjs, data_transfer_manager);
   } else {
+#if !defined(DISABLE_ML_OPS)
     utils::ContainerChecker c_checker(val_type);
     if (c_checker.IsMap()) {
       if (c_checker.IsMapOf<std::string, std::string>()) {
@@ -282,6 +284,7 @@ void AddNonTensorAsPyObj(const OrtValue& val, std::vector<py::object>& pyobjs, c
       } else if (c_checker.IsMapOf<int64_t, double>()) {
         AddNonTensor<MapInt64ToDouble>(val, pyobjs, data_transfer_manager);
       }
+
     } else {
       if (c_checker.IsSequenceOf<std::map<std::string, float>>()) {
         AddNonTensor<VectorMapStringToFloat>(val, pyobjs, data_transfer_manager);
@@ -291,6 +294,9 @@ void AddNonTensorAsPyObj(const OrtValue& val, std::vector<py::object>& pyobjs, c
         throw std::runtime_error("Output is a non-tensor type which is not supported.");
       }
     }
+#else
+    throw std::runtime_error("Map type is not supported in this build.");
+#endif
   }
 }
 

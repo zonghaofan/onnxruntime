@@ -416,7 +416,7 @@ common::Status InferenceSession::RegisterCustomRegistry(std::shared_ptr<CustomRe
   return Status::OK();
 }
 
-common::Status InferenceSession::SaveSessionToOrtFormat() const {
+common::Status InferenceSession::SaveToOrtFormat(const std::basic_string<ORTCHAR_T>& filepath) const {
   flatbuffers::FlatBufferBuilder builder(1024);
   auto ort_version = builder.CreateString(ORT_VERSION);
   flatbuffers::Offset<fbs::Model> model;
@@ -434,16 +434,22 @@ common::Status InferenceSession::SaveSessionToOrtFormat() const {
   auto session = sb.Finish();
   builder.Finish(session);
 
-  uint8_t* buf = builder.GetBufferPointer();
-  int size = builder.GetSize();
+  // TODO: Do we need to catch any std::exceptions from creating/writing to disk and convert to Status codes?
+  {
+    std::ofstream file(filepath, std::ios::binary);
 
-  std::ofstream file("ort.bin", std::ios::binary);
-  file.write((char*)buf, size);
+    uint8_t* buf = builder.GetBufferPointer();
+    int size = builder.GetSize();
+    file.write(reinterpret_cast<const char*>(buf), size);
+    file.close();
+  }
+
   return Status::OK();
 }
 
-common::Status InferenceSession::LoadSessionFromOrtFormat() {
-  return Status::OK();
+common::Status InferenceSession::LoadFromOrtFormat() {
+  ORT_NOT_IMPLEMENTED("TODO");
+  // return Status::OK();
 }
 
 common::Status InferenceSession::Load(std::function<common::Status(std::shared_ptr<Model>&)> loader,
@@ -1017,18 +1023,19 @@ common::Status InferenceSession::Initialize() {
                                                                         serialized_session_state,
                                                                         !keep_initializers));
 #if !defined(ORT_MINIMAL_BUILD)
-    if (session_options_.optimized_model_filepath.empty()) {
-      // Serialize optimized ONNX model.
-      SaveSessionToOrtFormat();
+    if (!session_options_.optimized_model_filepath.empty()) {
+      if (session_options_.graph_optimization_level >= TransformerLevel::Level3) {
+        LOGS(*session_logger_, WARNING)
+            << "Serializing optimized model with Graph Optimization level greater than ORT_ENABLE_EXTENDED. "
+               "The generated model may contain hardware and execution provider specific optimizations, "
+               " and should only be used in the same environment the model was optimized for.";
+      }
 
-      // ORT_RETURN_IF_ERROR_SESSIONID_(Model::Save(*model_, session_options_.optimized_model_filepath));
-      // if (session_options_.graph_optimization_level >= TransformerLevel::Level3) {
-      //   LOGS(*session_logger_, WARNING) << "Serializing Optimized ONNX model with Graph Optimization"
-      //                                      " level greater than ORT_ENABLE_EXTENDED. The generated"
-      //                                      " model may contain hardware and execution provider specific"
-      //                                      " optimizations, and should only be used in the same environment"
-      //                                      " the model was optimized for.";
-      // }
+      if (session_options_.optimized_model_format == SerializationFormat::ORT) {
+        ORT_RETURN_IF_ERROR_SESSIONID_(SaveToOrtFormat(session_options_.optimized_model_filepath));
+      } else {
+        ORT_RETURN_IF_ERROR_SESSIONID_(Model::Save(*model_, session_options_.optimized_model_filepath));
+      }
     }
 #endif  // !defined(ORT_MINIMAL_BUILD)
 

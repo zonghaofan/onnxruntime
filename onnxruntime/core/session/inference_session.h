@@ -466,9 +466,10 @@ class InferenceSession {
     return !custom_schema_registries_.empty();
   }
 
-  common::Status SaveSessionToOrtFormat() const;
-  common::Status LoadSessionFromOrtFormat();
+  common::Status SaveToOrtFormat(const std::basic_string<ORTCHAR_T>& filepath) const;
 #endif
+
+  common::Status LoadFromOrtFormat();
 
   common::Status LoadOrtModel(
       std::function<Status(gsl::span<const uint8_t>&)> get_serialized_bytes) ORT_MUST_USE_RESULT;

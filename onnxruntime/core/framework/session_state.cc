@@ -660,7 +660,8 @@ static Status GetSubGraphSessionStatesOrtFormat(flatbuffers::FlatBufferBuilder& 
             std::to_string(i) + "_" + std::to_string(node.Index()) + "_" + attr_name);
 
         flatbuffers::Offset<fbs::SessionState> session_state;
-        subgraph_session_state.SaveToOrtFormat(builder, session_state);
+        ORT_RETURN_IF_ERROR(
+            subgraph_session_state.SaveToOrtFormat(builder, session_state));
 
         fbs_subgraph_session_states.push_back(
             fbs::CreateSubGraphSessionState(builder, graph_id, session_state));

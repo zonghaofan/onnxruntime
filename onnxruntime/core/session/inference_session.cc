@@ -1042,6 +1042,10 @@ common::Status InferenceSession::Initialize() {
     session_state_->ResolveMemoryPatternFlag();
     is_inited_ = true;
 
+    // we don't directly use the ORT format bytes currently, so free those
+    ort_format_model_bytes_ = nullptr;
+    ort_format_model_num_bytes_ = 0;
+
     // and log telemetry
     bool model_has_fp16_inputs = ModelHasFP16Inputs(graph);
     env.GetTelemetryProvider().LogSessionCreation(

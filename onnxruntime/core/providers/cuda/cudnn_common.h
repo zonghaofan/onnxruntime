@@ -123,6 +123,14 @@ struct Consts<half> {
   static const float One;
 };
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+template<>
+struct Consts<nv_bfloat16> {
+  static const float Zero;
+  static const float One;
+};
+#endif
+
 inline double ClampCudnnBatchNormEpsilon(double epsilon) {
   if (epsilon < CUDNN_BN_MIN_EPSILON) {
     if (CUDNN_BN_MIN_EPSILON - epsilon > FLT_EPSILON)

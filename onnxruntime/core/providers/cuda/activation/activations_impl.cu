@@ -93,10 +93,18 @@ struct OP_ThresholdedRelu : public CtxThresholdedRelu {
 #define SPECIALIZED_UNARY_ACTIVATION_IMPL(name, T) \
   template void Impl_##name<T>(const T* input_data, T* output_data, const Ctx##name* func_ctx, size_t count);
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#define SPECIALIZED_UNARY_ACTIVATIONL_HFD(name)  \
+  SPECIALIZED_UNARY_ACTIVATION_IMPL(name, half)  \
+  SPECIALIZED_UNARY_ACTIVATION_IMPL(name, nv_bfloat16)  \
+  SPECIALIZED_UNARY_ACTIVATION_IMPL(name, float) \
+  SPECIALIZED_UNARY_ACTIVATION_IMPL(name, double)
+#else
 #define SPECIALIZED_UNARY_ACTIVATIONL_HFD(name)  \
   SPECIALIZED_UNARY_ACTIVATION_IMPL(name, half)  \
   SPECIALIZED_UNARY_ACTIVATION_IMPL(name, float) \
   SPECIALIZED_UNARY_ACTIVATION_IMPL(name, double)
+#endif
 
 #define UNARY_ACTIVATION_OP_NAME(name) \
   UNARY_ACTIVATION_IMPL(name);         \

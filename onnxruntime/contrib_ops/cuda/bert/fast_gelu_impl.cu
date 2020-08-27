@@ -45,7 +45,7 @@ __global__ void FastGeluKernel(const T a, const T b, const T c, int input_length
 
   if (idx < input_length) {
     const T x = input[idx];
-    const T in = (bias == nullptr) ? x : (x + bias[idx % bias_length]);
+    const T in = (bias == nullptr) ? x : (T)(x + bias[idx % bias_length]);
     const T cdf = a + a * _Tanh(in * (c * in * in + b));
     output[idx] = in * cdf;
   }
@@ -93,6 +93,15 @@ bool LaunchFastGeluKernel(const cudaDeviceProp& prop, cudaStream_t stream, int i
     const int gridSize = (input_length + blockSize - 1) / blockSize;
     FastGeluKernel<half, blockSize><<<gridSize, blockSize, 0, stream>>>(A, B, C, input_length, bias_length, input, bias, output);
   }
+
+  return CUDA_CALL(cudaPeekAtLastError());
+}
+
+template <>
+bool LaunchFastGeluKernel(const cudaDeviceProp& prop, cudaStream_t stream, int input_length, int bias_length, const nv_bfloat16* input, const nv_bfloat16* bias, nv_bfloat16* output) {
+  constexpr int blockSize = 256;
+  const int gridSize = (input_length + blockSize - 1) / blockSize;
+  FastGeluKernel<nv_bfloat16, blockSize><<<gridSize, blockSize, 0, stream>>>(A, B, C, input_length, bias_length, input, bias, output);
 
   return CUDA_CALL(cudaPeekAtLastError());
 }

@@ -23,17 +23,23 @@ ONNX_OPERATOR_KERNEL_EX(
         .InputMemoryType<OrtMemTypeCPUInput>(1),
     Dropout<true>);
 
-#define REGISTER_GRADIENT_KERNEL(OpName)                                 \
-  ONNX_OPERATOR_KERNEL_EX(                                               \
-      OpName,                                                            \
-      kMSDomain,                                                         \
-      1,                                                                 \
-      kCudaExecutionProvider,                                            \
-      KernelDefBuilder()                                                 \
-          .TypeConstraint("T", DataTypeImpl::AllIEEEFloatTensorTypes())  \
-          .TypeConstraint("T1", DataTypeImpl::AllIEEEFloatTensorTypes()) \
-          .TypeConstraint("T2", DataTypeImpl::GetTensorType<bool>())     \
-          .InputMemoryType<OrtMemTypeCPUInput>(2),                       \
+#define REGISTER_GRADIENT_KERNEL(OpName)                                    \
+  ONNX_OPERATOR_KERNEL_EX(                                                  \
+      OpName,                                                               \
+      kMSDomain,                                                            \
+      1,                                                                    \
+      kCudaExecutionProvider,                                               \
+      KernelDefBuilder()                                                    \
+          .TypeConstraint("T", {DataTypeImpl::GetTensorType<float>(),       \
+                                DataTypeImpl::GetTensorType<double>(),      \
+                                DataTypeImpl::GetTensorType<MLFloat16>(),   \
+                                DataTypeImpl::GetTensorType<BFloat16>()})   \
+          .TypeConstraint("T1", {DataTypeImpl::GetTensorType<float>(),      \
+                                 DataTypeImpl::GetTensorType<double>(),     \
+                                 DataTypeImpl::GetTensorType<MLFloat16>(),  \
+                                 DataTypeImpl::GetTensorType<BFloat16>()})  \
+          .TypeConstraint("T2", DataTypeImpl::GetTensorType<bool>())        \
+          .InputMemoryType<OrtMemTypeCPUInput>(2),                          \
       DropoutGrad);
 
 REGISTER_GRADIENT_KERNEL(DropoutGrad)
@@ -70,13 +76,13 @@ Status DropoutGrad::ComputeInternal(OpKernelContext* context) const {
   float ratio_data = default_ratio_;
   auto ratio = context->Input<Tensor>(2);
   if (ratio) {
-    utils::MLTypeCallDispatcher<GetRatioDataImpl, float, MLFloat16, double> t_disp(ratio->GetElementType());
+    utils::MLTypeCallDispatcher<GetRatioDataImpl, float, MLFloat16, double, BFloat16> t_disp(ratio->GetElementType());
     t_disp.Invoke(ratio, ratio_data);
   }
 
   auto dX = context->Output(0, shape);
 
-  utils::MLTypeCallDispatcher<DropoutGradComputeImpl, float, MLFloat16, double> t_disp(dY->GetElementType());
+  utils::MLTypeCallDispatcher<DropoutGradComputeImpl, float, MLFloat16, double, BFloat16> t_disp(dY->GetElementType());
   t_disp.Invoke(N, *dY, mask_data, ratio_data, *dX);
 
   return Status::OK();
@@ -88,8 +94,14 @@ ONNX_OPERATOR_KERNEL_EX(
     1,
     kCudaExecutionProvider,
     KernelDefBuilder()
-        .TypeConstraint("T", DataTypeImpl::AllIEEEFloatTensorTypes())
-        .TypeConstraint("T1", DataTypeImpl::AllIEEEFloatTensorTypes())
+        .TypeConstraint("T", {DataTypeImpl::GetTensorType<float>(),
+                              DataTypeImpl::GetTensorType<double>(),
+                              DataTypeImpl::GetTensorType<MLFloat16>(),
+                              DataTypeImpl::GetTensorType<BFloat16>()})
+        .TypeConstraint("T1", {DataTypeImpl::GetTensorType<float>(),
+                               DataTypeImpl::GetTensorType<double>(),
+                               DataTypeImpl::GetTensorType<MLFloat16>(),
+                               DataTypeImpl::GetTensorType<BFloat16>()})
         .TypeConstraint("T2", DataTypeImpl::GetTensorType<bool>())
         .InputMemoryType<OrtMemTypeCPUInput>(3)
         .InputMemoryType<OrtMemTypeCPUInput>(4),
@@ -161,7 +173,7 @@ Status BiasDropout::ComputeInternal(OpKernelContext* context) const {
   float ratio_data = default_ratio_;
   auto ratio = context->Input<Tensor>(3);
   if (ratio) {
-    utils::MLTypeCallDispatcher<GetRatioDataImpl, float, MLFloat16, double> t_disp(ratio->GetElementType());
+    utils::MLTypeCallDispatcher<GetRatioDataImpl, float, MLFloat16, double, BFloat16> t_disp(ratio->GetElementType());
     t_disp.Invoke(ratio, ratio_data);
   }
 
@@ -182,7 +194,7 @@ Status BiasDropout::ComputeInternal(OpKernelContext* context) const {
   const fast_divmod fdm_dim(gsl::narrow_cast<int>(dim));
   PhiloxGenerator& generator = generator_ ? *generator_ : PhiloxGenerator::Default();
 
-  utils::MLTypeCallDispatcherRet<Status, BiasDropoutComputeImpl, float, MLFloat16, double> t_disp(X->GetElementType());
+  utils::MLTypeCallDispatcherRet<Status, BiasDropoutComputeImpl, float, MLFloat16, double, BFloat16> t_disp(X->GetElementType());
   return t_disp.Invoke(GetDeviceProp(), N, fdm_dim, ratio_data, generator, *X, *bias, residual, *Y, mask_data);
 }
 

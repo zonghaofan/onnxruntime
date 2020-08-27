@@ -33,6 +33,7 @@ namespace cuda {
 REGISTER_GRADIENT_KERNEL_TYPED(float, float)
 REGISTER_GRADIENT_KERNEL_TYPED(double, double)
 REGISTER_GRADIENT_KERNEL_TYPED(MLFloat16, float)
+REGISTER_GRADIENT_KERNEL_TYPED(BFloat16, float)
 
 template <typename T, typename U>
 LayerNormGrad<T, U>::LayerNormGrad(const OpKernelInfo& op_kernel_info) : CudaKernel(op_kernel_info) {

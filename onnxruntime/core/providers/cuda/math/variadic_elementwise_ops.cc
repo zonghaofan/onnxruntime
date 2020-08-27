@@ -196,20 +196,20 @@ namespace {
 
 using SumOp = VariadicElementwiseOp<
     variadic_elementwise_ops::Sum,
-    MLFloat16, float, double>;
+    MLFloat16, float, double, BFloat16>;
 
 using MinOp = VariadicElementwiseOp<
     variadic_elementwise_ops::Min,
-    uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double>;
+    uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double, BFloat16>;
 
 using MaxOp = VariadicElementwiseOp<
     variadic_elementwise_ops::Max,
-    uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double>;
+    uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double, BFloat16>;
 
 const auto k_uzilhfd_datatypes =
-    BuildKernelDefConstraints<uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double>();
+    BuildKernelDefConstraints<uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double, BFloat16>();
 const auto k_hfd_datatypes =
-    BuildKernelDefConstraints<MLFloat16, float, double>();
+    BuildKernelDefConstraints<MLFloat16, float, double, BFloat16>();
 
 }  // namespace
 

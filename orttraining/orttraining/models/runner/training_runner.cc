@@ -108,10 +108,8 @@ Status TrainingRunner::Initialize() {
 
   if (params_.use_mixed_precision) {
     TrainingSession::TrainingConfiguration::MixedPrecisionConfiguration mp{};
-    mp.use_mixed_precision_initializers = params_.use_fp16_initializer;
-    if (params_.use_bfloat16) {
-      mp.mixed_precision_type = MixedPrecisionDataType::BF16;
-    }
+    mp.use_mixed_precision_initializers = params_.use_mixed_precision_initializer;
+    mp.mixed_precision_type = params_.mixed_precision_type;
     config.mixed_precision_config = mp;
   }
 
@@ -130,8 +128,8 @@ Status TrainingRunner::Initialize() {
     opt.learning_rate_input_name = params_.lr_params.feed_name;
     opt.weight_attributes_generator = params_.optimizer_attributes;
     opt.weight_int_attributes_generator = params_.optimizer_int_attributes;
-    opt.use_mixed_precision_moments = params_.use_fp16_moments;
-    opt.do_all_reduce_in_mixed_precision_type = params_.allreduce_in_fp16;
+    opt.use_mixed_precision_moments = params_.use_mixed_precision_moments;
+    opt.do_all_reduce_in_mixed_precision_type = params_.allreduce_in_mixed_precision_type;
     opt.use_nccl = params_.use_nccl;
     opt.deepspeed_zero = params_.deepspeed_zero;
     opt.adasum_reduction_type = params_.GetAdasumReductionType();
@@ -577,7 +575,7 @@ Status TrainingRunner::PrepareFetchNamesAndFetches(const SessionMode mode,
       fetch_names = params_.fetch_names;
 
       if (params_.use_mixed_precision) {
-        if (!params_.use_bfloat16) {
+        if (params_.mixed_precision_type == MixedPrecisionDataType::FP16) {
           auto it = opt_graph_outputs_.find(OptimizerOutputKey::GradientAllIsFinite);
           ORT_RETURN_IF(it == opt_graph_outputs_.end(), "Gradient norm's IsFinite output is missing in the optimizer output");
           fetch_names.push_back(it->second);

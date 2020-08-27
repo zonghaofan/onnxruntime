@@ -58,6 +58,7 @@ inline cublasStatus_t cublasGemmHelper(cublasHandle_t handle,
                      beta,
                      C, ldc);
 }
+
 inline cublasStatus_t cublasGemmHelper(cublasHandle_t handle,
                                        cublasOperation_t transa,
                                        cublasOperation_t transb,
@@ -98,6 +99,35 @@ inline cublasStatus_t cublasGemmHelper(cublasHandle_t handle,
                       beta,
                       C, ldc);
 #endif
+}
+
+inline cublasStatus_t cublasGemmHelper(cublasHandle_t handle,
+                                       cublasOperation_t transa,
+                                       cublasOperation_t transb,
+                                       int m, int n, int k,
+                                       const nv_bfloat16* alpha,
+                                       const nv_bfloat16* A, int lda,
+                                       const nv_bfloat16* B, int ldb,
+                                       const nv_bfloat16* beta,
+                                       nv_bfloat16* C, int ldc,
+                                       const cudaDeviceProp& prop) {
+  onnxruntime::cuda::CublasMathModeSetter math_mode_setter(prop, handle, CUBLAS_DEFAULT_MATH);
+
+  float h_a = onnxruntime::BFloat16(*reinterpret_cast<const uint16_t*>(alpha)).ToFloat();
+  float h_b = onnxruntime::BFloat16(*reinterpret_cast<const uint16_t*>(beta)).ToFloat();
+
+  // accumulating in FP32
+  return cublasGemmEx(handle,
+                      transa,
+                      transb,
+                      m, n, k,
+                      &h_a,
+                      A, CUDA_R_16BF, lda,
+                      B, CUDA_R_16BF, ldb,
+                      &h_b,
+                      C, CUDA_R_16BF, ldc,
+                      CUBLAS_COMPUTE_32F,
+                      CUBLAS_GEMM_DEFAULT);
 }
 
 // batched gemm
@@ -145,6 +175,7 @@ inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
                             Carray, ldc,
                             batch_count);
 }
+
 inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
                                               cublasOperation_t transa,
                                               cublasOperation_t transb,
@@ -187,6 +218,36 @@ inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
                             (__half**)Carray, ldc,
                             batch_count);
 #endif
+}
+
+inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
+                                              cublasOperation_t transa,
+                                              cublasOperation_t transb,
+                                              int m, int n, int k,
+                                              const nv_bfloat16* alpha,
+                                              const nv_bfloat16* Aarray[], int lda,
+                                              const nv_bfloat16* Barray[], int ldb,
+                                              const nv_bfloat16* beta,
+                                              nv_bfloat16* Carray[], int ldc,
+                                              int batch_count,
+                                              const cudaDeviceProp& prop) {
+  onnxruntime::cuda::CublasMathModeSetter math_mode_setter(prop, handle, CUBLAS_TENSOR_OP_MATH);
+  float h_a = onnxruntime::BFloat16(*reinterpret_cast<const uint16_t*>(alpha)).ToFloat();
+  float h_b = onnxruntime::BFloat16(*reinterpret_cast<const uint16_t*>(beta)).ToFloat();
+
+  // accumulating in FP32
+  return cublasGemmBatchedEx(handle,
+                             transa,
+                             transb,
+                             m, n, k,
+                             &h_a,
+                             (const void**)Aarray, CUDA_R_16BF, lda,
+                             (const void**)Barray, CUDA_R_16BF, ldb,
+                             &h_b,
+                             (void**)Carray, CUDA_R_16BF, ldc,
+                             batch_count,
+                             CUDA_R_32F,
+                             CUBLAS_GEMM_DEFAULT);
 }
 
 // strided batched gemm
@@ -286,6 +347,38 @@ inline cublasStatus_t cublasGemmStridedBatchedHelper(cublasHandle_t handle,
                                     C, ldc, strideC,
                                     batch_count);
 #endif
+}
+
+inline cublasStatus_t cublasGemmStridedBatchedHelper(cublasHandle_t handle,
+                                                     cublasOperation_t transa,
+                                                     cublasOperation_t transb,
+                                                     int m, int n, int k,
+                                                     const nv_bfloat16* alpha,
+                                                     const nv_bfloat16* A, int lda,
+                                                     long long int strideA,
+                                                     const nv_bfloat16* B, int ldb,
+                                                     long long int strideB,
+                                                     const nv_bfloat16* beta,
+                                                     nv_bfloat16* C, int ldc,
+                                                     long long int strideC,
+                                                     int batch_count,
+                                                     const cudaDeviceProp& prop) {
+  onnxruntime::cuda::CublasMathModeSetter math_mode_setter(prop, handle, CUBLAS_TENSOR_OP_MATH);
+  float h_a = onnxruntime::BFloat16(*reinterpret_cast<const uint16_t*>(alpha)).ToFloat();
+  float h_b = onnxruntime::BFloat16(*reinterpret_cast<const uint16_t*>(beta)).ToFloat();
+  // accumulating in FP32
+  return cublasGemmStridedBatchedEx(handle,
+                                    transa,
+                                    transb,
+                                    m, n, k,
+                                    &h_a,
+                                    A, CUDA_R_16BF, lda, strideA,
+                                    B, CUDA_R_16BF, ldb, strideB,
+                                    &h_b,
+                                    C, CUDA_R_16BF, ldc, strideC,
+                                    batch_count,
+                                    CUDA_R_32F,
+                                    CUBLAS_GEMM_DEFAULT);
 }
 
 // axpy
@@ -476,6 +569,7 @@ inline cublasStatus_t cublasCopyHelper(cublasHandle_t handle, int n, const doubl
   return cublasDcopy(handle, n, x, incx, y, incy);
 }
 cublasStatus_t cublasCopyHelper(cublasHandle_t handle, int n, const half* x, int incx, half* y, int incy);
+cublasStatus_t cublasCopyHelper(cublasHandle_t handle, int n, const nv_bfloat16* x, int incx, nv_bfloat16* y, int incy);
 
 // curand
 inline curandStatus_t curandGenerateUniformHelper(curandGenerator_t generator, float* outputPtr, size_t num) {

@@ -91,12 +91,27 @@ struct ViaTypeMap<half> {
   typedef float ViaT;
 };
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+template <>
+struct ViaTypeMap<nv_bfloat16> {
+  typedef float ViaT;
+};
+#endif
+
 template <typename InT, typename OutT>
 struct OP_Cast {
   __device__ __inline__ OutT operator()(const InT& a) const {
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+    const bool any_fp16 = std::is_same<half, InT>::value || std::is_same<half, OutT>::value;
+    const bool any_bf16 = std::is_same<nv_bfloat16, InT>::value || std::is_same<nv_bfloat16, OutT>::value;
+    typedef typename std::conditional<any_bf16, nv_bfloat16, OutT>::type T1;
+    typedef typename std::conditional<any_fp16, half, T1>::type T2;
+    typedef typename ViaTypeMap<T2>::ViaT ViaT;
+#else
     const bool any_float16 = std::is_same<half, InT>::value || std::is_same<half, OutT>::value;
     typedef typename std::conditional<any_float16, half, OutT>::type T;
     typedef typename ViaTypeMap<T>::ViaT ViaT;
+#endif
     return (OutT)((ViaT)a);
   }
 };
@@ -115,6 +130,22 @@ void Impl_Cast(
 #define SPECIALIZED_CAST_IMPL2(InT, OutT) \
   template void Impl_Cast<InT, OutT>(const InT* input_data, OutT* output_data, size_t count);
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#define SPECIALIZED_CAST_FROM(T)          \
+  SPECIALIZED_CAST_IMPL2(T, half)         \
+  SPECIALIZED_CAST_IMPL2(T, nv_bfloat16)  \
+  SPECIALIZED_CAST_IMPL2(T, float)        \
+  SPECIALIZED_CAST_IMPL2(T, double)       \
+  SPECIALIZED_CAST_IMPL2(T, int8_t)       \
+  SPECIALIZED_CAST_IMPL2(T, int16_t)      \
+  SPECIALIZED_CAST_IMPL2(T, int32_t)      \
+  SPECIALIZED_CAST_IMPL2(T, int64_t)      \
+  SPECIALIZED_CAST_IMPL2(T, uint8_t)      \
+  SPECIALIZED_CAST_IMPL2(T, uint16_t)     \
+  SPECIALIZED_CAST_IMPL2(T, uint32_t)     \
+  SPECIALIZED_CAST_IMPL2(T, uint64_t)     \
+  SPECIALIZED_CAST_IMPL2(T, bool)
+#else
 #define SPECIALIZED_CAST_FROM(T)      \
   SPECIALIZED_CAST_IMPL2(T, half)     \
   SPECIALIZED_CAST_IMPL2(T, float)    \
@@ -128,8 +159,12 @@ void Impl_Cast(
   SPECIALIZED_CAST_IMPL2(T, uint32_t) \
   SPECIALIZED_CAST_IMPL2(T, uint64_t) \
   SPECIALIZED_CAST_IMPL2(T, bool)
+#endif
 
 SPECIALIZED_CAST_FROM(half)
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+SPECIALIZED_CAST_FROM(nv_bfloat16)
+#endif
 SPECIALIZED_CAST_FROM(float)
 SPECIALIZED_CAST_FROM(double)
 SPECIALIZED_CAST_FROM(int8_t)

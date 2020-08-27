@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
+#include <cuda_bf16.h>
 #include "core/providers/cuda/cuda_common.h"
 #include "core/providers/cuda/shared_inc/cuda_call.h"
 
@@ -107,6 +108,11 @@ __device__ __inline__ double _Sqrt(double a) { return sqrt(a); }
 template <>
 __device__ __inline__ half _Sqrt(half a) { return half(sqrtf((float)a)); }
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+template <>
+__device__ __inline__ nv_bfloat16 _Sqrt(nv_bfloat16 a) { return nv_bfloat16(sqrtf((float)a)); }
+#endif
+
 template <typename T>
 __device__ __inline__ T _Erf(T a);
 
@@ -149,6 +155,11 @@ __device__ __inline__ double _Exp(double a) { return exp(a); }
 template <>
 __device__ __inline__ half _Exp(half a) { return half(expf((float)a)); }
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+template <>
+__device__ __inline__ nv_bfloat16 _Exp(nv_bfloat16 a) { return nv_bfloat16(expf((float)a)); }
+#endif
+
 template <typename T>
 __device__ __inline__ T _Log(T a);
 
@@ -161,6 +172,11 @@ __device__ __inline__ double _Log(double a) { return log(a); }
 template <>
 __device__ __inline__ half _Log(half a) { return half(logf((float)a)); }
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+template <>
+__device__ __inline__ nv_bfloat16 _Log(nv_bfloat16 a) { return nv_bfloat16(logf((float)a)); }
+#endif
+
 template <typename T>
 __device__ __inline T _Tanh(T a);
 
@@ -172,6 +188,11 @@ __device__ __inline__ double _Tanh(double a) { return tanh(a); }
 
 template <>
 __device__ __inline__ half _Tanh(half a) { return half(tanhf((float)a)); }
+
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+template <>
+__device__ __inline__ nv_bfloat16 _Tanh(nv_bfloat16 a) { return nv_bfloat16(tanhf((float)a)); }
+#endif
 
 template <>
 __device__ __inline__ half2 _Tanh(half2 a) {
@@ -216,6 +237,11 @@ __device__ __inline__ double _Normcdf(double a) { return normcdf(a); }
 
 template <>
 __device__ __inline__ half _Normcdf(half a) { return half(normcdff((float)a)); }
+
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+template <>
+__device__ __inline__ nv_bfloat16 _Normcdf(nv_bfloat16 a) { return nv_bfloat16(normcdff((float)a)); }
+#endif
 
 template <typename T>
 __device__ __inline__ T _Gelu(T a) {

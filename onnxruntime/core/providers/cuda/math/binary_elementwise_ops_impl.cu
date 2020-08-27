@@ -52,6 +52,17 @@ namespace cuda {
                                   const TArray<int64_t>* rhs_padded_strides, const T1* rhs_data, \
                                   const TArray<fast_divmod>* fdm_output_strides, const fast_divmod& fdm_H, const fast_divmod& fdm_C, T* output_data, size_t count);
 
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#define SPECIALIZED_BINARY_ELEMENTWISE_IMPL_UZILHFD(x) \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, uint32_t)     \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, uint64_t)     \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, int32_t)      \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, int64_t)      \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, half)         \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, nv_bfloat16)  \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, float)        \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, double)
+#else
 #define SPECIALIZED_BINARY_ELEMENTWISE_IMPL_UZILHFD(x) \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, uint32_t)     \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, uint64_t)     \
@@ -60,16 +71,25 @@ namespace cuda {
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, half)         \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, float)        \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, double)
+#endif
 
 #define SPECIALIZED_BINARY_ELEMENTWISE_IMPL_OIL(x) \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, bool)     \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, int32_t)  \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, int64_t)
 
-#define SPECIALIZED_BINARY_ELEMENTWISE_IMPL_HFD(x) \
-  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, half)     \
-  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, float)    \
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#define SPECIALIZED_BINARY_ELEMENTWISE_IMPL_HFD(x)    \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, half)        \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, nv_bfloat16) \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, float)       \
   SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, double)
+#else
+#define SPECIALIZED_BINARY_ELEMENTWISE_IMPL_HFD(x)    \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, half)        \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, float)       \
+  SPECIALIZED_BINARY_ELEMENTWISE_IMPL(x, double)
+#endif
 
 // create declarations for impl
 #define BINARY_OP_NAME_EXPR(name, expr) \

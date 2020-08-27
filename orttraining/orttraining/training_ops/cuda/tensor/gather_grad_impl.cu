@@ -150,6 +150,9 @@ void GatherGradImpl(
 
 SPECIALIZED_GRAD_IMPL2(float)
 SPECIALIZED_GRAD_IMPL2(half)
+#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+SPECIALIZED_GRAD_IMPL2(nv_bfloat16)
+#endif
 
 }  // namespace cuda
 }  // namespace onnxruntime

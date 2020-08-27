@@ -16,7 +16,7 @@ ONNX_OPERATOR_KERNEL_EX(
     1,
     kCudaExecutionProvider,
     KernelDefBuilder()
-        .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double>())
+        .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double, BFloat16>())
         .MayInplace(0, 0),
     BiasGeluGrad_dX<gelu_computation_mode::Default>);
 
@@ -26,7 +26,7 @@ ONNX_OPERATOR_KERNEL_EX(
     1,
     kCudaExecutionProvider,
     KernelDefBuilder()
-        .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double>())
+        .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double, BFloat16>())
         .MayInplace(0, 0),
     BiasGeluGrad_dX<gelu_computation_mode::Approximation>);
 
@@ -70,7 +70,7 @@ Status BiasGeluGrad_dX<GeluComputationMode>::ComputeInternal(OpKernelContext* co
 
   utils::MLTypeCallDispatcher<
       KernelLaunchDispatcher,
-      MLFloat16, float, double>
+      MLFloat16, float, double, BFloat16>
       dispatcher{X->GetElementType()};
   dispatcher.Invoke(input_size, bias_size, *dY, *X, *B, *dX);
 

@@ -59,6 +59,7 @@ namespace cuda {
 
 #define UNARY_ACTIVATION_OP_HFD(name, ver)        \
   UNARY_ACTIVATION_OP_TYPED(name, ver, MLFloat16) \
+  UNARY_ACTIVATION_OP_TYPED(name, ver, BFloat16) \
   UNARY_ACTIVATION_OP_TYPED(name, ver, float)     \
   UNARY_ACTIVATION_OP_TYPED(name, ver, double)
 

@@ -675,7 +675,7 @@ Status SessionState::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   node_indices.reserve(size);
   kernel_def_hashes.reserve(size);
   for (const auto& kvp : kernel_create_info_map_) {
-    node_indices.push_back(kvp.first);
+    node_indices.push_back(gsl::narrow_cast<uint32_t>(kvp.first));
     kernel_def_hashes.push_back(kvp.second->kernel_def->GetHash());
   }
 

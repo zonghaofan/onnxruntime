@@ -513,7 +513,7 @@ Status Node::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   nb.add_doc_string(doc_string);
   nb.add_domain(domain);
   nb.add_since_version(since_version_);
-  nb.add_index(index_);
+  nb.add_index(gsl::narrow_cast<uint32_t>(index_));
   nb.add_op_type(op_type);
   nb.add_type(static_cast<fbs::NodeType>(node_type_));
   nb.add_execution_provider_type(ep);
@@ -531,14 +531,15 @@ flatbuffers::Offset<fbs::NodeEdge> Node::GetEdgesOrtFormat(flatbuffers::FlatBuff
     std::vector<fbs::EdgeEnd> edges;
     edges.reserve(edge_set.size());
     for (const auto& edge : edge_set)
-      edges.push_back(fbs::EdgeEnd(edge.GetNode().Index(), edge.GetSrcArgIndex(), edge.GetDstArgIndex()));
+      edges.push_back(fbs::EdgeEnd(gsl::narrow_cast<uint32_t>(edge.GetNode().Index()),
+                                   edge.GetSrcArgIndex(), edge.GetDstArgIndex()));
 
     return edges;
   };
 
   const auto input_edges = get_edges(relationships_.input_edges);
   const auto output_edges = get_edges(relationships_.output_edges);
-  return fbs::CreateNodeEdgeDirect(builder, index_, &input_edges, &output_edges);
+  return fbs::CreateNodeEdgeDirect(builder, gsl::narrow_cast<uint32_t>(index_), &input_edges, &output_edges);
 }
 
 void Node::Init(const std::string& name,
@@ -2624,7 +2625,7 @@ common::Status Graph::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   gb.add_initializers(initializers);
   gb.add_node_args(node_args);
   gb.add_nodes(nodes);
-  gb.add_max_node_index(static_cast<uint32_t>(nodes_.size()));
+  gb.add_max_node_index(gsl::narrow_cast<uint32_t>(nodes_.size()));
   gb.add_node_edges(node_edges);
   gb.add_inputs(inputs);
   gb.add_outputs(outputs);

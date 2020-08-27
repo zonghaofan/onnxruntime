@@ -40,17 +40,31 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   if (!status.IsOK())
     return status;
 
-  const int64_t input_size = input_shape.Size();
   const int64_t indices_size = indices_shape.Size();
-  // We iterate using index outer_dims. It is guaranteed not to exceed input_data dims.
-  const int64_t input_outer_dims_prod = input_shape.SizeToDimension(axis);
   // Input batch size addressable by axis
   const int64_t input_batch_size = input_shape.SizeFromDimension(axis);
   const int64_t output_batch_size = indices_shape.SizeFromDimension(axis);
   const int64_t axis_input_dim_value = input_shape[axis];
   // Block size under the axis
-  const int64_t axis_input_block_size = input_shape.SizeFromDimension(axis + 1);
   const int64_t axis_index_block_size = indices_shape.SizeFromDimension(axis + 1);
+  const int64_t axis_input_block_size = input_shape.SizeFromDimension(axis + 1);
+
+  TensorPitches input_pitches(input_shape.GetDims());
+  TensorPitches indices_pitches(indices_shape.GetDims());
+  // We only pitches/strides after axis
+  const int64_t pitches_size = input_pitches.size();
+  const int32_t axis_one = static_cast<int32_t>(axis + 1);
+  int64_t strides_size = 0;
+  if (axis_one < pitches_size) {
+    strides_size = pitches_size - axis_one;
+  }
+
+  TArray<int64_t> input_strides(static_cast<int32_t>(strides_size));
+  TArray<fast_divmod> indices_strides(static_cast<int32_t>(strides_size));
+  for (auto i = axis_one; i < pitches_size; ++i) {
+    input_strides[i - axis_one] = input_pitches[i];
+    indices_strides[i - axis_one] = fast_divmod(static_cast<int32_t>(indices_pitches[i]));
+  }
 
   // create output tensor
   auto* output_tensor = context->Output(0, indices_shape);
@@ -68,7 +82,6 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
   std::unique_ptr<char[]> index_cpu(new char[indices_tensor->SizeInBytes()]);
   CUDA_RETURN_IF_ERROR(cudaMemcpy(index_cpu.get(), indices_tensor->DataRaw(), indices_tensor->SizeInBytes(),
                                   cudaMemcpyDeviceToHost));
-
     // Create output on CPU
   std::unique_ptr<char[]> output_cpu(new char[output_tensor->SizeInBytes()]);
 
@@ -77,21 +90,77 @@ Status GatherElements::ComputeInternal(OpKernelContext* context) const {
 
   if (indices_tensor->IsDataType<int32_t>() ||
       indices_tensor->IsDataType<int64_t>()) {
-    GatherElementsImpl(
-        input_cpu.get(),
-        axis_index_block_size,
-        axis_input_block_size,
-        axis_input_dim_value,
-        input_batch_size,
-        output_batch_size,
-        index_cpu.get(),
-        indices_size,
-        index_element_size,
-        output_cpu.get(),
-        element_size);
+    switch (element_size) {
+      case sizeof(int8_t):
+      GatherElementsImpl<int8_t>(
+          reinterpret_cast<const int8_t*>(input_cpu.get()),
+          input_strides,
+          indices_strides,
+          axis_index_block_size,
+          axis_input_block_size,
+          axis_input_dim_value,
+          input_batch_size,
+          output_batch_size,
+          index_cpu.get(),
+          indices_size,
+          index_element_size,
+          reinterpret_cast<int8_t*>(output_cpu.get()));
+        break;
+      case sizeof(int16_t):
+      GatherElementsImpl<int16_t>(
+          reinterpret_cast<const int16_t*>(input_cpu.get()),
+          input_strides,
+          indices_strides,
+          axis_index_block_size,
+          axis_input_block_size,
+          axis_input_dim_value,
+          input_batch_size,
+          output_batch_size,
+          index_cpu.get(),
+          indices_size,
+          index_element_size,
+          reinterpret_cast<int16_t*>(output_cpu.get()));
+      break;
 
-    // CPU algo test ONLY!
-    // Copy data back to GPU for test
+    case sizeof(int32_t):
+        GatherElementsImpl<int32_t>(
+            reinterpret_cast<const int32_t*>(input_cpu.get()),
+            input_strides,
+            indices_strides,
+            axis_index_block_size,
+            axis_input_block_size,
+            axis_input_dim_value,
+            input_batch_size,
+            output_batch_size,
+            index_cpu.get(),
+            indices_size,
+            index_element_size,
+            reinterpret_cast<int32_t*>(output_cpu.get()));
+        break;
+
+    case sizeof(int64_t):
+      GatherElementsImpl<int64_t>(
+          reinterpret_cast<const int64_t*>(input_cpu.get()),
+          input_strides,
+          indices_strides,
+          axis_index_block_size,
+          axis_input_block_size,
+          axis_input_dim_value,
+          input_batch_size,
+          output_batch_size,
+          index_cpu.get(),
+          indices_size,
+          index_element_size,
+          reinterpret_cast<int64_t*>(output_cpu.get()));
+      break;
+
+      // Should not reach here
+      default:
+        ORT_THROW("Unsupported element size by the GatherElements CUDA kernel");
+    }
+
+     //CPU algo test ONLY!
+     //Copy data back to GPU for test
     CUDA_RETURN_IF_ERROR(cudaMemcpy(output_data, output_cpu.get(), output_tensor->SizeInBytes(),
                                       cudaMemcpyHostToDevice));
     return Status::OK();

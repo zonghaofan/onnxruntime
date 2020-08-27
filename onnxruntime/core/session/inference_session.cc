@@ -756,6 +756,97 @@ common::Status InferenceSession::TransformGraph(onnxruntime::Graph& graph,
 
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
+template <typename T>
+static Status LoadOrtModelBytes(const std::basic_string<T>& model_uri,
+                                std::basic_string<ORTCHAR_T>& model_location,
+                                size_t& num_bytes, std::unique_ptr<uint8_t[]>& bytes) {
+  model_location = ToWideString(model_uri);
+  ORT_RETURN_IF_ERROR(Env::Default().GetFileLength(model_location.c_str(), num_bytes));
+
+  bytes.reset(new uint8_t[num_bytes]);
+
+  std::ifstream bytes_stream(model_uri, std::ifstream::in | std::ifstream::binary);
+  bytes_stream.read(reinterpret_cast<char*>(bytes.get()), num_bytes);
+
+  if (!bytes_stream) {
+    return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL,
+                           "Load model from ", ToMBString(model_uri), " failed. Only ",
+                           bytes_stream.gcount(), "/", num_bytes, " bytes were able to be read.");
+  }
+
+  return Status::OK();
+}
+
+Status InferenceSession::LoadOrtModel(const std::string& model_uri) {
+  return LoadOrtModel(
+      [&](gsl::span<const uint8_t>& bytes) {
+        ORT_RETURN_IF_ERROR(LoadOrtModelBytes(model_uri, model_location_,
+                                              ort_format_model_num_bytes_, ort_format_model_bytes_));
+
+        bytes = gsl::make_span<const uint8_t>(ort_format_model_bytes_.get(), ort_format_model_num_bytes_);
+        return Status::OK();
+      });
+}
+
+#ifdef WIN32
+Status InferenceSession::LoadOrtModel(const std::wstring& model_uri) {
+  return LoadOrtModel(
+      [&](gsl::span<const uint8_t>& bytes) {
+        ORT_RETURN_IF_ERROR(LoadOrtModelBytes(model_uri, model_location_,
+                                              ort_format_model_num_bytes_, ort_format_model_bytes_));
+
+        bytes = gsl::make_span<const uint8_t>(ort_format_model_bytes_.get(), ort_format_model_num_bytes_);
+        return Status::OK();
+      });
+}
+#endif
+
+Status InferenceSession::LoadOrtModel(const void* model_data, int model_data_len) {
+  return LoadOrtModel([&](gsl::span<const uint8_t>& bytes) {
+    bytes = gsl::make_span<const uint8_t>(static_cast<const uint8_t*>(model_data), model_data_len);
+    return Status::OK();
+  });
+}
+
+Status InferenceSession::LoadOrtModel(std::function<Status(gsl::span<const uint8_t>&)> get_serialized_bytes) {
+  /* TODO: Convert to flatbuffers 
+  auto ref = flexbuffers::GetRoot(flexbuffer_serialized_bytes.data(), flexbuffer_serialized_bytes.size());
+  std::cout << ref.ToString();
+  auto root = ref.AsMap();
+  */
+
+  {
+    std::lock_guard<onnxruntime::OrtMutex> l(session_mutex_);
+
+    if (is_model_loaded_) {  // already loaded
+      Status status(common::ONNXRUNTIME, common::MODEL_LOADED, "This session already contains a loaded model.");
+      LOGS(*session_logger_, ERROR) << status.ErrorMessage();
+      return status;
+    }
+
+    if (is_inited_) {
+      Status status(common::ONNXRUNTIME, common::MODEL_LOADED, "This session has already been initialized.");
+      LOGS(*session_logger_, ERROR) << status.ErrorMessage();
+      return status;
+    }
+
+    gsl::span<const uint8_t> bytes;
+    ORT_RETURN_IF_ERROR(get_serialized_bytes(bytes));
+
+    // need to go from unique_ptr to shared_ptr when moving into model_
+    std::unique_ptr<Model> tmp_model;
+
+    // TODO:
+    // ORT_RETURN_IF_ERROR(Model::Deserialize(root["model"], *session_logger_, tmp_model));
+    // ORT_RETURN_IF_ERROR(SaveModelMetadata(*tmp_model));
+    model_ = std::move(tmp_model);
+
+    is_model_loaded_ = true;
+  }
+
+  return Status::OK();
+}
+
 bool InferenceSession::IsInitialized() const {
   std::lock_guard<onnxruntime::OrtMutex> l(session_mutex_);
   return is_inited_;
@@ -917,8 +1008,13 @@ common::Status InferenceSession::Initialize() {
     // bool keep_initializers = !session_options_.optimized_model_filepath.empty();
     bool keep_initializers = true;
 
+    auto serialized_session_state = ort_format_model_bytes_ != nullptr
+                                        ? fbs::GetInferenceSession(ort_format_model_bytes_.get())->session_state()
+                                        : nullptr;
+
     ORT_RETURN_IF_ERROR_SESSIONID_(session_state_->FinalizeSessionState(model_location_, kernel_registry_manager_,
                                                                         session_options_,
+                                                                        serialized_session_state,
                                                                         !keep_initializers));
 #if !defined(ORT_MINIMAL_BUILD)
     if (session_options_.optimized_model_filepath.empty()) {

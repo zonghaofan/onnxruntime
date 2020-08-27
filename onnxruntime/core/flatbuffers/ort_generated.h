@@ -279,8 +279,10 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) EdgeEnd FLATBUFFERS_FINAL_CLASS {
   int32_t dst_arg_index_;
 
  public:
-  EdgeEnd() {
-    memset(static_cast<void *>(this), 0, sizeof(EdgeEnd));
+  EdgeEnd()
+      : node_index_(0),
+        src_arg_index_(0),
+        dst_arg_index_(0) {
   }
   EdgeEnd(uint32_t _node_index, int32_t _src_arg_index, int32_t _dst_arg_index)
       : node_index_(flatbuffers::EndianScalar(_node_index)),
@@ -327,7 +329,6 @@ struct ShapeBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ShapeBuilder &operator=(const ShapeBuilder &);
   flatbuffers::Offset<Shape> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Shape>(end);
@@ -388,7 +389,6 @@ struct DimensionBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  DimensionBuilder &operator=(const DimensionBuilder &);
   flatbuffers::Offset<Dimension> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Dimension>(end);
@@ -452,7 +452,6 @@ struct DimensionValueBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  DimensionValueBuilder &operator=(const DimensionValueBuilder &);
   flatbuffers::Offset<DimensionValue> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<DimensionValue>(end);
@@ -516,7 +515,6 @@ struct TensorTypeAndShapeBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  TensorTypeAndShapeBuilder &operator=(const TensorTypeAndShapeBuilder &);
   flatbuffers::Offset<TensorTypeAndShape> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<TensorTypeAndShape>(end);
@@ -578,7 +576,6 @@ struct NodeEdgeBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  NodeEdgeBuilder &operator=(const NodeEdgeBuilder &);
   flatbuffers::Offset<NodeEdge> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<NodeEdge>(end);
@@ -641,8 +638,8 @@ struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   int32_t since_version() const {
     return GetField<int32_t>(VT_SINCE_VERSION, 0);
   }
-  uint32_t index() const {
-    return GetField<uint32_t>(VT_INDEX, 0);
+  int32_t index() const {
+    return GetField<int32_t>(VT_INDEX, 0);
   }
   const flatbuffers::String *op_type() const {
     return GetPointer<const flatbuffers::String *>(VT_OP_TYPE);
@@ -677,7 +674,7 @@ struct Node FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffset(verifier, VT_DOMAIN) &&
            verifier.VerifyString(domain()) &&
            VerifyField<int32_t>(verifier, VT_SINCE_VERSION) &&
-           VerifyField<uint32_t>(verifier, VT_INDEX) &&
+           VerifyField<int32_t>(verifier, VT_INDEX) &&
            VerifyOffset(verifier, VT_OP_TYPE) &&
            verifier.VerifyString(op_type()) &&
            VerifyField<int32_t>(verifier, VT_TYPE) &&
@@ -717,8 +714,8 @@ struct NodeBuilder {
   void add_since_version(int32_t since_version) {
     fbb_.AddElement<int32_t>(Node::VT_SINCE_VERSION, since_version, 0);
   }
-  void add_index(uint32_t index) {
-    fbb_.AddElement<uint32_t>(Node::VT_INDEX, index, 0);
+  void add_index(int32_t index) {
+    fbb_.AddElement<int32_t>(Node::VT_INDEX, index, 0);
   }
   void add_op_type(flatbuffers::Offset<flatbuffers::String> op_type) {
     fbb_.AddOffset(Node::VT_OP_TYPE, op_type);
@@ -748,7 +745,6 @@ struct NodeBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  NodeBuilder &operator=(const NodeBuilder &);
   flatbuffers::Offset<Node> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Node>(end);
@@ -762,7 +758,7 @@ inline flatbuffers::Offset<Node> CreateNode(
     flatbuffers::Offset<flatbuffers::String> doc_string = 0,
     flatbuffers::Offset<flatbuffers::String> domain = 0,
     int32_t since_version = 0,
-    uint32_t index = 0,
+    int32_t index = 0,
     flatbuffers::Offset<flatbuffers::String> op_type = 0,
     onnxruntime::experimental::fbs::NodeType type = onnxruntime::experimental::fbs::NodeType_Primitive,
     flatbuffers::Offset<flatbuffers::String> execution_provider_type = 0,
@@ -794,7 +790,7 @@ inline flatbuffers::Offset<Node> CreateNodeDirect(
     const char *doc_string = nullptr,
     const char *domain = nullptr,
     int32_t since_version = 0,
-    uint32_t index = 0,
+    int32_t index = 0,
     const char *op_type = nullptr,
     onnxruntime::experimental::fbs::NodeType type = onnxruntime::experimental::fbs::NodeType_Primitive,
     const char *execution_provider_type = nullptr,
@@ -875,7 +871,6 @@ struct ValueInfoBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ValueInfoBuilder &operator=(const ValueInfoBuilder &);
   flatbuffers::Offset<ValueInfo> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<ValueInfo>(end);
@@ -961,7 +956,6 @@ struct TypeInfoBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  TypeInfoBuilder &operator=(const TypeInfoBuilder &);
   flatbuffers::Offset<TypeInfo> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<TypeInfo>(end);
@@ -1029,7 +1023,6 @@ struct OperatorSetIdBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  OperatorSetIdBuilder &operator=(const OperatorSetIdBuilder &);
   flatbuffers::Offset<OperatorSetId> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<OperatorSetId>(end);
@@ -1130,7 +1123,6 @@ struct TensorBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  TensorBuilder &operator=(const TensorBuilder &);
   flatbuffers::Offset<Tensor> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Tensor>(end);
@@ -1314,7 +1306,6 @@ struct AttributeBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  AttributeBuilder &operator=(const AttributeBuilder &);
   flatbuffers::Offset<Attribute> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Attribute>(end);
@@ -1490,7 +1481,6 @@ struct GraphBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  GraphBuilder &operator=(const GraphBuilder &);
   flatbuffers::Offset<Graph> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Graph>(end);
@@ -1638,7 +1628,6 @@ struct ModelBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ModelBuilder &operator=(const ModelBuilder &);
   flatbuffers::Offset<Model> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Model>(end);
@@ -1731,7 +1720,6 @@ struct KernelCreateInfosBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  KernelCreateInfosBuilder &operator=(const KernelCreateInfosBuilder &);
   flatbuffers::Offset<KernelCreateInfos> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<KernelCreateInfos>(end);
@@ -1803,7 +1791,6 @@ struct SubGraphSessionStateBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  SubGraphSessionStateBuilder &operator=(const SubGraphSessionStateBuilder &);
   flatbuffers::Offset<SubGraphSessionState> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<SubGraphSessionState>(end);
@@ -1870,7 +1857,6 @@ struct SessionStateBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  SessionStateBuilder &operator=(const SessionStateBuilder &);
   flatbuffers::Offset<SessionState> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<SessionState>(end);
@@ -1944,7 +1930,6 @@ struct InferenceSessionBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  InferenceSessionBuilder &operator=(const InferenceSessionBuilder &);
   flatbuffers::Offset<InferenceSession> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<InferenceSession>(end);

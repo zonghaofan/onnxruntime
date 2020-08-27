@@ -679,7 +679,7 @@ Status SessionState::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   node_indices.reserve(size);
   kernel_def_hashes.reserve(size);
   for (const auto& kvp : kernel_create_info_map_) {
-    node_indices.push_back(kvp.first);
+    node_indices.push_back(gsl::narrow<uint32_t>(kvp.first));
     kernel_def_hashes.push_back(kvp.second->kernel_def->GetHash());
   }
 
@@ -733,23 +733,29 @@ Status SessionState::CreateSubgraphSessionState() {
 Status SessionState::FinalizeSessionState(const std::basic_string<PATH_CHAR_TYPE>& graph_location,
                                           KernelRegistryManager& kernel_registry_manager,
                                           const SessionOptions& session_options,
+                                          const onnxruntime::experimental::fbs::SessionState* serialized_session_state,
                                           bool remove_initializers) {
   // recursively create the subgraph session state instances and populate the kernel create info in them.
   // it's simpler to handle the kernel create info recursively when deserializing,
   // so also do it recursively when calling PopulateKernelCreateInfo for consistency.
   ORT_RETURN_IF_ERROR(CreateSubgraphSessionState());
 
+  if (serialized_session_state) {
+    ORT_NOT_IMPLEMENTED("TODO: Deserialize");
+  } else {
 #if !defined(ORT_MINIMAL_BUILD)
-  ORT_RETURN_IF_ERROR(PopulateKernelCreateInfo(kernel_registry_manager));
-  return FinalizeSessionStateImpl(graph_location, kernel_registry_manager, nullptr, session_options,
-                                  remove_initializers);
+    ORT_RETURN_IF_ERROR(PopulateKernelCreateInfo(kernel_registry_manager));
+    return FinalizeSessionStateImpl(graph_location, kernel_registry_manager, nullptr, session_options,
+                                    remove_initializers);
 #else
-  ORT_UNUSED_PARAMETER(graph_location);
-  ORT_UNUSED_PARAMETER(kernel_registry_manager);
-  ORT_UNUSED_PARAMETER(session_options);
-  ORT_UNUSED_PARAMETER(remove_initializers);
-  return Status(ONNXRUNTIME, NOT_IMPLEMENTED, "TODO: Add deserialization of kernel create info.");
+    ORT_UNUSED_PARAMETER(graph_location);
+    ORT_UNUSED_PARAMETER(kernel_registry_manager);
+    ORT_UNUSED_PARAMETER(session_options);
+    ORT_UNUSED_PARAMETER(remove_initializers);
+    return Status(ONNXRUNTIME, INVALID_ARGUMENT,
+                  "Serialized session state must be provided from an ORT format model in this build.");
 #endif
+  }
 }
 
 Status SessionState::FinalizeSessionStateImpl(const std::basic_string<PATH_CHAR_TYPE>& graph_location,

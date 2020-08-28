@@ -19,8 +19,8 @@ def run(model, test_only):
         # file it shouldn't change with new builds.
         if not os.path.exists(onnx_target_path):
             so = ort.SessionOptions()
-            so.optimized_model_format = ort.SerializationFormat.ONNX
             so.optimized_model_filepath = onnx_target_path
+            so.add_session_config_entry('session.save_model_format', 'ONNX')
             so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_EXTENDED  # Skip NCHWc optimizations
 
             print(f"Optimizing {model} and saving in ONNX format to {onnx_target_path}")
@@ -32,8 +32,8 @@ def run(model, test_only):
 
         # Second, convert optimized ONNX model to ORT format
         so = ort.SessionOptions()
-        so.optimized_model_format = ort.SerializationFormat.ORT
         so.optimized_model_filepath = ort_target_path
+        so.add_session_config_entry('session.save_model_format', 'ORT')
 
         print(f"Converting optimized ONNX model {onnx_target_path} to ORT format model {ort_target_path}")
         _ = ort.InferenceSession(onnx_target_path, sess_options=so)

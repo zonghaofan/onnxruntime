@@ -34,7 +34,8 @@ TEST(OrtModelOnlyTests, SerializeToOrtFormat) {
   SessionOptions so;
   so.session_logid = "SerializeToOrtFormat";
   so.optimized_model_filepath = output_file;
-  so.optimized_model_format = ORT;
+  // not strictly necessary - type should be inferred from the filename
+  so.AddConfigEntry(ORT_SESSION_OPTIONS_CONFIG_SAVE_MODEL_FORMAT, "ORT");
 
   InferenceSessionGetGraphWrapper session_object{so, GetEnvironment()};
 
@@ -55,10 +56,15 @@ TEST(OrtModelOnlyTests, SerializeToOrtFormat) {
 
   ASSERT_STATUS_OK(session_object.Run(feeds, output_names, &fetches));
 
-  // load serialized version
-  InferenceSessionGetGraphWrapper session_object2{so, GetEnvironment()};
+  SessionOptions so2;
+  so.session_logid = "LoadOrtFormat";
+  // not strictly necessary - type should be inferred from the filename, but to be sure we're testing what we
+  // think we're testing set it.
+  so.AddConfigEntry(ORT_SESSION_OPTIONS_CONFIG_LOAD_MODEL_FORMAT, "ORT");
 
-  ASSERT_STATUS_OK(session_object2.LoadOrtModel(output_file));
+  // load serialized version
+  InferenceSessionGetGraphWrapper session_object2{so2, GetEnvironment()};
+  ASSERT_STATUS_OK(session_object2.Load(output_file));
   ASSERT_STATUS_OK(session_object2.Initialize());
 
   // compare contents on Graph instances
@@ -113,15 +119,15 @@ TEST(OrtModelOnlyTests, SerializeToOrtFormat) {
 // FIXME: Need to save ORT format model and checkin to testdata
 /*
 // test that we can deserialize and run a model
-TEST(OrtModelOnlyTests, DeserializeFromOrtFormat) {
+TEST(OrtModelOnlyTests, LoadOrtFormatModel) {
   const auto output_file = ORT_TSTR("ort_github_issue_4031.onnx.ort");
   SessionOptions so;
-  so.session_logid = "DeserializeFromOrtFormat";
+  so.session_logid = "LoadOrtFormatModel";
   so.optimized_model_filepath = output_file;
   so.optimized_model_format = ORT;
 
   InferenceSessionGetGraphWrapper session_object2{so, GetEnvironment()};
-  ASSERT_STATUS_OK(session_object2.LoadOrtModel(output_file));
+  ASSERT_STATUS_OK(session_object2.Load(output_file)); // infer type from filename
   ASSERT_STATUS_OK(session_object2.Initialize());
 
   const auto& graph2 = session_object2.GetGraph();

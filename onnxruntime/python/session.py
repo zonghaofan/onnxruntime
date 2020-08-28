@@ -181,15 +181,21 @@ class InferenceSession(Session):
     """
     This is the main class used to run a model.
     """
-    def __init__(self, path_or_bytes, sess_options=None, providers=None, provider_options=None,
-                 ort_format_model=False):
+    def __init__(self, path_or_bytes, sess_options=None, providers=None, provider_options=None):
         """
-        :param path_or_bytes: filename or serialized model in a byte string
+        :param path_or_bytes: filename or serialized ONNX or ORT format model in a byte string
         :param sess_options: session options
         :param providers: list of providers to use for session. If empty, will use all available providers.
         :param provider_options: list of provider options dict for each provider, in the same order as 'providers'
-        :param ort_format_model: True if creating a session with an ORT format model. False for an ONNX format model.
 
+        The model type will be inferred unless explicitly set in the SessionOptions.
+        To explicitly set:
+          so = onnxruntime.SessionOptions()
+          so.add_session_config_entry('session.load_model_format', 'ONNX') or
+          so.add_session_config_entry('session.load_model_format', 'ORT') or
+
+        A file extension of '.ort' will be inferred as an ORT format model.
+        All other filenames are assumed to be ONNX format models.
         """
 
         if isinstance(path_or_bytes, str):
@@ -201,14 +207,9 @@ class InferenceSession(Session):
         else:
             raise TypeError("Unable to load from type '{0}'".format(type(path_or_bytes)))
 
-        if ort_format_model:
-            if (providers and len(providers) > 0) or (provider_options and len(provider_options) > 0):
-                raise ValueError("ORT format model does not support specifying 'providers' or 'provider_options'")
-
         self._sess_options = sess_options
         self._sess_options_initial = sess_options
         self._enable_fallback = True
-        self._ort_format_model = ort_format_model
 
         sess = C.InferenceSession(self._sess_options if self._sess_options else C.get_default_session_options())
         Session.__init__(self, sess)
@@ -220,17 +221,10 @@ class InferenceSession(Session):
     # inference session when the providers/provider options change. This setup also means we have to hold a reference
     # to path_or_bytes forever which is not optimal if that is in-memory bytes.
     def _load_model(self, providers, provider_options):
-
         if self._model_path:
-            if self._ort_format_model:
-                self._sess.load_ort_model(self._model_path, True)
-            else:
-                self._sess.load_model(self._model_path, True, providers or [], provider_options or [])
+            self._sess.load_model(self._model_path, True, providers or [], provider_options or [])
         else:
-            if self._ort_format_model:
-                self._sess.load_ort_model(self._model_bytes, False)
-            else:
-                self._sess.load_model(self._model_bytes, False, providers or [], provider_options or [])
+            self._sess.load_model(self._model_bytes, False, providers or [], provider_options or [])
 
         self._sess_options = self._sess.session_options
         self._inputs_meta = self._sess.inputs_meta

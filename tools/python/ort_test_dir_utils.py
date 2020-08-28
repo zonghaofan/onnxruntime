@@ -194,9 +194,7 @@ def run_test_dir(model_or_dir):
     if not test_dirs:
         raise ValueError(f"No directories with name starting with 'test' were found in {model_dir}.")
 
-    ort_format_model = model_path.endswith('.ort')
-
-    sess = ort.InferenceSession(model_path, ort_format_model=ort_format_model)
+    sess = ort.InferenceSession(model_path)
 
     for d in test_dirs:
         print(d)

@@ -201,8 +201,17 @@ class InferenceSession {
     */
   common::Status RegisterCustomRegistry(std::shared_ptr<CustomRegistry> custom_registry) ORT_MUST_USE_RESULT;
 
+#endif  // !defined(ORT_MINIMAL_BUILD)
+
   /**
-    * Load an ONNX model.
+    * Load an ONNX or ORT format model.
+    *
+    * Set SessionOptions session config value ORT_SESSION_OPTIONS_CONFIG_LOAD_MODEL_FORMAT to 'ORT' or 'ONNX' to 
+    * explicitly choose model format.
+    *
+    * If format is not explicitly specified and filename ends in '.ort' it will be inferred to be an ORT format model.
+	* All other files are assumed to be in ONNX format.
+    * 
     * @param model_uri absolute path of the model file.
     * @return OK if success.
     */
@@ -211,19 +220,26 @@ class InferenceSession {
   common::Status Load(const std::wstring& model_uri) ORT_MUST_USE_RESULT;
 #endif
   /**
-    * Load an ONNX model.
-    * @param istream object of the model.
-    * @return OK if success.
-    */
-  common::Status Load(std::istream& model_istream) ORT_MUST_USE_RESULT;
-
-  /**
-    * Load an ONNX model.
+    * Load an ONNX or ORT format model.
+    *
+    * Set SessionOptions session config value ORT_SESSION_OPTIONS_CONFIG_LOAD_MODEL_FORMAT to 'ORT' or 'ONNX' to 
+    * explicitly choose model format.
+    *
+    * If format is not explicitly specified the model format will be inferred from the bytes, defaulting to ONNX.
+    * 
     * @param model_data Model data buffer
     * @param model_data_len Model data buffer size
     * @return OK if success.
     */
   common::Status Load(const void* model_data, int model_data_len) ORT_MUST_USE_RESULT;
+
+#if !defined(ORT_MINIMAL_BUILD)
+  /**
+    * Load an ONNX model.
+    * @param istream object of the model.
+    * @return OK if success.
+    */
+  common::Status Load(std::istream& model_istream) ORT_MUST_USE_RESULT;
 
   /**
     * Load an ONNX model from the member model_proto_.
@@ -232,26 +248,6 @@ class InferenceSession {
     */
   common::Status Load() ORT_MUST_USE_RESULT;
 #endif  // !defined(ORT_MINIMAL_BUILD)
-
-  /**
-    * Load an ORT format model.
-    * @param model_uri absolute path of the model file.
-    * @return OK if success.
-    */
-  common::Status LoadOrtModel(const std::string& model_uri) ORT_MUST_USE_RESULT;
-#ifdef _WIN32
-  common::Status LoadOrtModel(const std::wstring& model_uri) ORT_MUST_USE_RESULT;
-#endif
-
-  /**
-    * Load an ORT format model.
-    * @param model_data Model data buffer
-    * @param model_data_len Model data buffer size
-    * @return OK if success.
-    * @remarks TODO: Provide way to load from in-memory bytes without copying. InferenceSession would need to
-    *                take ownership of the buffer passed in.
-    */
-  common::Status LoadOrtModel(const void* model_data, int model_data_len) ORT_MUST_USE_RESULT;
 
   /**
     * Initializes a previously loaded ONNX model. Initialization includes but is not
@@ -468,6 +464,26 @@ class InferenceSession {
 
   common::Status SaveToOrtFormat(const std::basic_string<ORTCHAR_T>& filepath) const;
 #endif
+
+  /**
+    * Load an ORT format model.
+    * @param model_uri absolute path of the model file.
+    * @return OK if success.
+    */
+  common::Status LoadOrtModel(const std::string& model_uri) ORT_MUST_USE_RESULT;
+#ifdef _WIN32
+  common::Status LoadOrtModel(const std::wstring& model_uri) ORT_MUST_USE_RESULT;
+#endif
+
+  /**
+    * Load an ORT format model.
+    * @param model_data Model data buffer
+    * @param model_data_len Model data buffer size
+    * @return OK if success.
+    * @remarks TODO: Provide way to load from in-memory bytes without copying. InferenceSession would need to
+    *                take ownership of the buffer passed in.
+    */
+  common::Status LoadOrtModel(const void* model_data, int model_data_len) ORT_MUST_USE_RESULT;
 
   common::Status LoadOrtModel(
       std::function<Status(gsl::span<const uint8_t>&)> get_serialized_bytes) ORT_MUST_USE_RESULT;

@@ -861,10 +861,6 @@ void addObjectMethods(py::module& m, Environment& env) {
       .def_static("cuda", []() { return OrtDevice::GPU; })
       .def_static("default_memory", []() { return OrtDevice::MemType::DEFAULT; });
 
-  py::enum_<SerializationFormat>(m, "SerializationFormat")
-      .value("ONNX", SerializationFormat::ONNX)
-      .value("ORT", SerializationFormat::ORT);
-
   py::class_<SessionIOBinding> binding(m, "SessionIOBinding");
   binding
       .def(py::init<InferenceSession*>())
@@ -976,9 +972,14 @@ Set this option to false if you don't want it. Default is True.)pbdoc")
       .def_readwrite("enable_profiling", &SessionOptions::enable_profiling,
                      R"pbdoc(Enable profiling for this session. Default is false.)pbdoc")
       .def_readwrite("optimized_model_filepath", &SessionOptions::optimized_model_filepath,
-                     R"pbdoc(File path to serialize optimized model. By default, optimized model is not serialized if optimized_model_filepath is not provided.)pbdoc")
-      .def_readwrite("optimized_model_format", &SessionOptions::optimized_model_format,
-                     R"pbdoc(Format to serialize optimized model. )pbdoc")
+                     R"pbdoc(
+File path to serialize optimized model to. 
+Optimized model is not serialized unless optimized_model_filepath is set.
+Serialized model format will default to ONNX unless:
+ - add_session_config_entry is used to set 'session.save_model_format' to 'ORT', or
+ - there is no 'session.save_model_format' config entry and optimized_model_filepath ends in '.ort' (case insensitive)
+
+)pbdoc")
       .def_readwrite("enable_mem_pattern", &SessionOptions::enable_mem_pattern,
                      R"pbdoc(Enable the memory pattern optimization. Default is true.)pbdoc")
       .def_readwrite("logid", &SessionOptions::session_logid,
@@ -1066,7 +1067,7 @@ Applies to session load, initialization, etc. Default is 0.)pbdoc")
       .def(
           "add_session_config_entry",
           [](SessionOptions* options, const char* config_key, const char* config_value) -> void {
-            const Status status = AddSessionConfigEntryImpl(*options, config_key, config_value);
+            const Status status = options->AddConfigEntry(config_key, config_value);
             if (!status.IsOK())
               throw std::runtime_error(status.ErrorMessage());
           },
@@ -1075,7 +1076,7 @@ Applies to session load, initialization, etc. Default is 0.)pbdoc")
           "get_session_config_entry",
           [](SessionOptions* options, const char* config_key) -> std::string {
             const std::string key(config_key);
-            if (!HasSessionConfigEntry(*options, key))
+            if (!options->HasConfigEntry(key))
               throw std::runtime_error("SessionOptions does not have configuration with key: " + key);
 
             return options->session_configurations.at(key);
@@ -1195,19 +1196,7 @@ including arg name, arg type (contains both type and shape).)pbdoc")
 
             InitializeSession(sess, provider_types, provider_options);
           },
-          R"pbdoc(Load a model saved in ONNX format.)pbdoc")
-      .def(
-          "load_ort_model",
-          [](InferenceSession* sess, const std::string arg, bool is_arg_file_name) {
-            if (is_arg_file_name) {
-              OrtPybindThrowIfError(sess->LoadOrtModel(arg));
-            } else {
-              OrtPybindThrowIfError(sess->LoadOrtModel(arg.data(), arg.size()));
-            }
-
-            InitializeSession(sess, {}, {});
-          },
-          R"pbdoc(Load a model saved in ORT format.)pbdoc")
+          R"pbdoc(Load a model saved in ONNX or ORT format.)pbdoc")
       .def("run", [](InferenceSession* sess, std::vector<std::string> output_names, std::map<std::string, py::object> pyfeeds, RunOptions* run_options = nullptr) -> std::vector<py::object> {
         NameMLValMap feeds;
         for (auto _ : pyfeeds) {

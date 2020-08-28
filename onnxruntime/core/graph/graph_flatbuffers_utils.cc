@@ -16,13 +16,11 @@ static flatbuffers::Offset<fbs::Dimension> GetTensorDimensionOrtFormat(
     flatbuffers::FlatBufferBuilder& builder,
     const TensorShapeProto_Dimension& tensor_shape_dim) {
   auto denotation = builder.CreateString(tensor_shape_dim.denotation());
-  flatbuffers::Offset<fbs::DimensionValue> dim_val;
+  flatbuffers::Offset<fbs::DimensionValue> dim_val = 0;
   if (tensor_shape_dim.has_dim_param()) {
     dim_val = fbs::CreateDimensionValueDirect(builder, fbs::DimensionValueType_PARAM, 0, tensor_shape_dim.dim_param().c_str());
   } else if (tensor_shape_dim.has_dim_value()) {
     dim_val = fbs::CreateDimensionValueDirect(builder, fbs::DimensionValueType_VALUE, tensor_shape_dim.dim_value());
-  } else {
-    dim_val = fbs::CreateDimensionValueDirect(builder);
   }
 
   return fbs::CreateDimension(builder, dim_val, denotation);
@@ -172,7 +170,7 @@ Status GetAttributeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
       GET_FBS_ATTR(builder, type, t, fbs_tensor);
     } break;
     case fbs::AttributeType_GRAPH: {
-      ORT_RETURN_IF_NOT(!graph, "GetAttributeOrtFormat, graph is null");
+      ORT_RETURN_IF_NOT(nullptr != graph, "GetAttributeOrtFormat, graph is null");
       flatbuffers::Offset<fbs::Graph> fbs_graph;
       ORT_RETURN_IF_ERROR(graph->SaveToOrtFormat(builder, fbs_graph));
       GET_FBS_ATTR(builder, type, g, fbs_graph);
@@ -213,6 +211,187 @@ Status GetAttributeOrtFormat(flatbuffers::FlatBufferBuilder& builder,
 
 #undef GET_FBS_ATTR
 #undef GET_DATA_VEC
+
+#define FBS_SET_STR_VAL(OBJ, FUNC, FBS_STR) \
+  if (FBS_STR) {                            \
+    OBJ.FUNC(FBS_STR->str());               \
+  }
+
+Status LoadInitializerOrtFormat(const fbs::Tensor& fbs_tensor,
+                                TensorProto& initializer) {
+  initializer.Clear();
+
+  FBS_SET_STR_VAL(initializer, set_name, fbs_tensor.name());
+  FBS_SET_STR_VAL(initializer, set_doc_string, fbs_tensor.doc_string());
+
+  auto fbs_dims = fbs_tensor.dims();
+  ORT_RETURN_IF_NOT(nullptr != fbs_dims, "fbs_dims cannot be null");
+  initializer.mutable_dims()->Add(fbs_dims->cbegin(), fbs_dims->cend());
+
+  auto fbs_data_type = fbs_tensor.data_type();
+  initializer.set_data_type(fbs_data_type);
+  if (fbs_data_type == fbs::TensorDataType_STRING) {
+    auto fbs_str_data = fbs_tensor.string_data();
+    ORT_RETURN_IF_NOT(nullptr != fbs_str_data, "fbs_str_data cannot be null");
+    auto mutable_str_data = initializer.mutable_string_data();
+    mutable_str_data->Reserve(fbs_str_data->size());
+    for (const auto& fbs_str : *fbs_str_data) {
+      mutable_str_data->Add(fbs_str->str());
+    }
+  } else {
+    auto fbs_raw_data = fbs_tensor.raw_data();
+    // Should we throw in this case? or just leave the raw_data to be empty?
+    ORT_RETURN_IF_NOT(nullptr != fbs_raw_data, "fbs_raw_data cannot be null");
+    // fbs_raw_data is uint8_t vector, so the size is byte size
+    initializer.set_raw_data(fbs_raw_data->Data(), fbs_raw_data->size());
+  }
+
+  return Status::OK();
+}
+
+static Status LoadTensorDimensionOrtFormat(const fbs::Dimension& fbs_dim,
+                                           TensorShapeProto_Dimension& dim) {
+  dim.Clear();
+  FBS_SET_STR_VAL(dim, set_denotation, fbs_dim.denotation());
+  auto fbs_dim_val = fbs_dim.value();
+  if (fbs_dim_val) {
+    auto type = fbs_dim_val->dim_type();
+    if (type == fbs::DimensionValueType_VALUE)
+      dim.set_dim_value(fbs_dim_val->dim_value());
+    else if (type == fbs::DimensionValueType_PARAM) {
+      auto fbs_dim_param = fbs_dim_val->dim_param();
+      ORT_RETURN_IF_NOT(nullptr != fbs_dim_param, "fbs_dim_param cannot be null");
+      dim.set_dim_param(fbs_dim_param->str());
+    }
+  }
+  return Status::OK();
+}
+
+static Status LoadTensorTypeAndShapeOrtFormat(const fbs::TensorTypeAndShape& fbs_tensor_type,
+                                              TypeProto_Tensor& tensor_type_proto) {
+  tensor_type_proto.Clear();
+  tensor_type_proto.set_elem_type(fbs_tensor_type.elem_type());
+  auto fbs_shape = fbs_tensor_type.shape();
+  if (fbs_shape) {
+    auto fbs_dims = fbs_shape->dim();
+    if (fbs_dims) {
+      auto dims = tensor_type_proto.mutable_shape()->mutable_dim();
+      dims->Reserve(fbs_dims->size());
+      for (const auto fbs_dim : *fbs_dims) {
+        ORT_RETURN_IF_NOT(fbs_dim, "fbs_dim cannot be null");
+        TensorShapeProto_Dimension dim;
+        ORT_RETURN_IF_ERROR(LoadTensorDimensionOrtFormat(*fbs_dim, *dims->Add()));
+      }
+    }
+  }
+  return Status::OK();
+}
+
+static Status LoadTypeInfoOrtFormat(const fbs::TypeInfo& fbs_type_info,
+                                    TypeProto& type_proto) {
+  type_proto.Clear();
+  FBS_SET_STR_VAL(type_proto, set_denotation, fbs_type_info.denotation());
+  auto value_type = fbs_type_info.value_type();
+  if (value_type == fbs::TypeInfoValue_tensor_type) {
+    auto fbs_tensor_type = fbs_type_info.value_as_tensor_type();
+    ORT_RETURN_IF_NOT(nullptr != fbs_tensor_type, "fbs_tensor_type cannot be null");
+    ORT_RETURN_IF_ERROR(LoadTensorTypeAndShapeOrtFormat(*fbs_tensor_type, *type_proto.mutable_tensor_type()));
+  } else {
+    return ORT_MAKE_STATUS(ONNXRUNTIME, INVALID_ARGUMENT, "Type:", value_type, " is not supported for now");
+  }
+
+  return Status::OK();
+}
+
+Status LoadValueInfoOrtFormat(const fbs::ValueInfo& fbs_value_info,
+                              ONNX_NAMESPACE::ValueInfoProto& value_info_proto) {
+  value_info_proto.Clear();
+
+  FBS_SET_STR_VAL(value_info_proto, set_name, fbs_value_info.name());
+  FBS_SET_STR_VAL(value_info_proto, set_doc_string, fbs_value_info.doc_string());
+
+  auto fbs_type_info = fbs_value_info.type();
+  ORT_RETURN_IF_NOT(nullptr != fbs_type_info, "fbs_type_info cannot be null");
+  ORT_RETURN_IF_ERROR(LoadTypeInfoOrtFormat(*fbs_type_info, *value_info_proto.mutable_type()));
+
+  return Status::OK();
+}
+
+onnxruntime::common::Status LoadAttributeOrtFormat(const fbs::Attribute& fbs_attr,
+                                                   ONNX_NAMESPACE::AttributeProto& attr_proto,
+                                                   std::unique_ptr<onnxruntime::Graph>& sub_graph,
+                                                   Graph& graph, Node& node,
+                                                   const logging::Logger& logger) {
+  attr_proto.Clear();
+  FBS_SET_STR_VAL(attr_proto, set_name, fbs_attr.name());
+  FBS_SET_STR_VAL(attr_proto, set_doc_string, fbs_attr.doc_string());
+  auto type = static_cast<AttributeProto_AttributeType>(fbs_attr.type());
+  attr_proto.set_type(type);
+  switch (type) {
+    case AttributeProto_AttributeType_FLOAT: {
+      attr_proto.set_f(fbs_attr.f());
+    } break;
+    case AttributeProto_AttributeType_INT: {
+      attr_proto.set_i(fbs_attr.i());
+    } break;
+    case AttributeProto_AttributeType_STRING: {
+      auto fbs_str = fbs_attr.s();
+      ORT_RETURN_IF_NOT(nullptr != fbs_str, "fbs_str cannot be null");
+      attr_proto.set_s(fbs_str->str());
+    } break;
+    case AttributeProto_AttributeType_TENSOR: {
+      auto fbs_tensor = fbs_attr.t();
+      ORT_RETURN_IF_NOT(nullptr != fbs_tensor, "fbs_tensor cannot be null");
+      ORT_RETURN_IF_ERROR(LoadInitializerOrtFormat(*fbs_tensor, *attr_proto.mutable_t()));
+    } break;
+    case AttributeProto_AttributeType_GRAPH: {
+      auto fbs_graph = fbs_attr.g();
+      ORT_RETURN_IF_NOT(nullptr != fbs_graph, "fbs_graph cannot be null");
+      attr_proto.mutable_g()->set_name("Empty graph proto from deserialization of ORT format model");
+      ORT_RETURN_IF_ERROR(Graph::LoadFromOrtFormat(*fbs_graph, graph, node, logger, sub_graph));
+    } break;
+    case AttributeProto_AttributeType_FLOATS: {
+      auto fbs_floats = fbs_attr.floats();
+      ORT_RETURN_IF_NOT(nullptr != fbs_floats, "fbs_floats cannot be null");
+      auto floats = attr_proto.mutable_floats();
+      floats->Reserve(fbs_floats->size());
+      floats->Add(fbs_floats->cbegin(), fbs_floats->cend());
+    } break;
+    case AttributeProto_AttributeType_INTS: {
+      auto fbs_ints = fbs_attr.ints();
+      ORT_RETURN_IF_NOT(nullptr != fbs_ints, "fbs_ints cannot be null");
+      auto* ints = attr_proto.mutable_ints();
+      ints->Reserve(fbs_ints->size());
+      ints->Add(fbs_ints->cbegin(), fbs_ints->cend());
+    } break;
+    case AttributeProto_AttributeType_STRINGS: {
+      auto fbs_strings = fbs_attr.strings();
+      ORT_RETURN_IF_NOT(nullptr != fbs_strings, "fbs_strings cannot be null");
+      auto* strings = attr_proto.mutable_strings();
+      strings->Reserve(fbs_strings->size());
+      for (const auto* fbs_str : *fbs_strings) {
+        ORT_RETURN_IF_NOT(nullptr != fbs_str, "fbs_str cannot be null");
+        strings->Add(fbs_str->str());
+      }
+    } break;
+    case AttributeProto_AttributeType_TENSORS: {
+      auto fbs_tensors = fbs_attr.tensors();
+      ORT_RETURN_IF_NOT(nullptr != fbs_tensors, "fbs_tensors cannot be null");
+      auto* tensors = attr_proto.mutable_tensors();
+      tensors->Reserve(fbs_tensors->size());
+      for (const auto* fbs_tensor : *fbs_tensors) {
+        ORT_RETURN_IF_NOT(nullptr != fbs_tensor, "fbs_str cannot be null");
+        ORT_RETURN_IF_NOT(nullptr != fbs_tensor, "fbs_tensor cannot be null");
+        ORT_RETURN_IF_ERROR(LoadInitializerOrtFormat(*fbs_tensor, *tensors->Add()));
+      }
+    } break;
+
+    default:
+      break;
+  }
+
+  return Status::OK();
+}
 
 }  // namespace utils
 }  // namespace experimental

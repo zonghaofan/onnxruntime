@@ -542,6 +542,63 @@ common::Status Model::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   return Status::OK();
 }
 
+Model::Model() : model_path_{} {
+}
+
+#if !defined(ORT_MINIMAL_BUILD)
+
+#define SET_MODEL_STR_DATA(SRC, DEST1, DEST2) \
+  if (SRC) {                                  \
+    DEST1(SRC->str());                        \
+  }
+
+#else
+
+#define SET_MODEL_STR_DATA(SRC, DEST1, DEST2) \
+  if (SRC) {                                  \
+    DEST2 = SRC->str();                       \
+  }
+
+#endif
+
+common::Status Model::LoadFromOrtFormat(const fbs::Model& fbs_model,
+                                        const logging::Logger& logger,
+                                        std::unique_ptr<Model>& model) {
+  model.reset(new Model());
+
+#if !defined(ORT_MINIMAL_BUILD)
+  model->model_proto_.set_model_version(fbs_model.model_version());
+  model->model_proto_.set_ir_version(fbs_model.ir_version());
+#else
+  model_version_ = fbs_model.model_version();
+  ir_version_ = fbs_model.ir_version();
+#endif
+
+  SET_MODEL_STR_DATA(fbs_model.producer_name(), model->model_proto_.set_producer_name, producer_name_);
+  SET_MODEL_STR_DATA(fbs_model.producer_version(), model->model_proto_.set_producer_version, producer_version_);
+  SET_MODEL_STR_DATA(fbs_model.domain(), model->model_proto_.set_domain, domain_);
+  SET_MODEL_STR_DATA(fbs_model.doc_string(), model->model_proto_.set_doc_string, doc_string_);
+
+  std::unordered_map<std::string, int> domain_to_version;
+  auto fbs_op_set_ids = fbs_model.opset_import();
+  if (fbs_op_set_ids) {
+    for (const auto* entry : *fbs_op_set_ids) {
+      std::string domain_ = entry->domain() ? entry->domain()->str() : "";
+      domain_to_version.emplace(domain_, gsl::narrow_cast<int>(entry->version()));
+    }
+  }
+
+  auto fbs_graph = fbs_model.graph();
+  ORT_RETURN_IF_NOT(nullptr != fbs_graph, "fbs_graph cannot be null");
+  ORT_RETURN_IF_ERROR(Graph::LoadFromOrtFormat(*fbs_graph, *model,
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+                                               std::make_shared<SchemaRegistryManager>(),
+#endif
+                                               domain_to_version, logger, model->graph_));
+
+  return Status::OK();
+}
+
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
 }  // namespace onnxruntime

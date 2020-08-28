@@ -447,11 +447,6 @@ common::Status InferenceSession::SaveToOrtFormat(const std::basic_string<ORTCHAR
   return Status::OK();
 }
 
-common::Status InferenceSession::LoadFromOrtFormat() {
-  ORT_NOT_IMPLEMENTED("TODO");
-  // return Status::OK();
-}
-
 common::Status InferenceSession::Load(std::function<common::Status(std::shared_ptr<Model>&)> loader,
                                       const std::string& event_name) {
   Status status = Status::OK();
@@ -815,11 +810,16 @@ Status InferenceSession::LoadOrtModel(const void* model_data, int model_data_len
 }
 
 Status InferenceSession::LoadOrtModel(std::function<Status(gsl::span<const uint8_t>&)> get_serialized_bytes) {
-  /* TODO: Convert to flatbuffers 
+  /* TODO: Convert to flatbuffers
   auto ref = flexbuffers::GetRoot(flexbuffer_serialized_bytes.data(), flexbuffer_serialized_bytes.size());
   std::cout << ref.ToString();
   auto root = ref.AsMap();
   */
+  gsl::span<const uint8_t> bytes;
+  ORT_RETURN_IF_ERROR(get_serialized_bytes(bytes));
+
+  const auto* fbs_session = fbs::GetInferenceSession(bytes.data());
+  ORT_RETURN_IF_NOT(nullptr != fbs_session, "fbs_session cannot be null");
 
   {
     std::lock_guard<onnxruntime::OrtMutex> l(session_mutex_);
@@ -836,19 +836,21 @@ Status InferenceSession::LoadOrtModel(std::function<Status(gsl::span<const uint8
       return status;
     }
 
-    gsl::span<const uint8_t> bytes;
-    ORT_RETURN_IF_ERROR(get_serialized_bytes(bytes));
+    const auto* fbs_model = fbs_session->model();
+    ORT_RETURN_IF_NOT(nullptr != fbs_model, "fbs_model cannot be null");
 
     // need to go from unique_ptr to shared_ptr when moving into model_
     std::unique_ptr<Model> tmp_model;
-
-    // TODO:
-    // ORT_RETURN_IF_ERROR(Model::Deserialize(root["model"], *session_logger_, tmp_model));
-    // ORT_RETURN_IF_ERROR(SaveModelMetadata(*tmp_model));
+    ORT_RETURN_IF_ERROR(Model::LoadFromOrtFormat(*fbs_model, *session_logger_, tmp_model));
+    ORT_RETURN_IF_ERROR(SaveModelMetadata(*tmp_model));
     model_ = std::move(tmp_model);
 
     is_model_loaded_ = true;
   }
+
+  // Initialize takes the session_mutex_ as well so we need to have released it prior to calling this
+  const auto* fbs_sess_state = fbs_session->session_state();
+  ORT_RETURN_IF_NOT(nullptr != fbs_sess_state, "fbs_sess_state cannot be null");
 
   return Status::OK();
 }

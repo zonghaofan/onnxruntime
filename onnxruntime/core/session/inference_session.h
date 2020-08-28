@@ -248,7 +248,7 @@ class InferenceSession {
     * @param model_data Model data buffer
     * @param model_data_len Model data buffer size
     * @return OK if success.
-    * @remarks TODO: Provide way to load from in-memory bytes without copying. InferenceSession would need to 
+    * @remarks TODO: Provide way to load from in-memory bytes without copying. InferenceSession would need to
     *                take ownership of the buffer passed in.
     */
   common::Status LoadOrtModel(const void* model_data, int model_data_len) ORT_MUST_USE_RESULT;
@@ -468,8 +468,6 @@ class InferenceSession {
 
   common::Status SaveToOrtFormat(const std::basic_string<ORTCHAR_T>& filepath) const;
 #endif
-
-  common::Status LoadFromOrtFormat();
 
   common::Status LoadOrtModel(
       std::function<Status(gsl::span<const uint8_t>&)> get_serialized_bytes) ORT_MUST_USE_RESULT;

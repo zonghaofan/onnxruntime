@@ -731,7 +731,7 @@ Status SessionState::LoadFromOrtFormat(const fbs::SessionState& fbs_session_stat
   ORT_RETURN_IF_NOT(node_indices->size() == kernel_def_hashes->size(),
                     "node_indices and kernel_def_hashes should have same size");
 
-  for (size_t i = 0; i < node_indices->size(); i++) {
+  for (flatbuffers::uoffset_t i = 0; i < node_indices->size(); i++) {
     auto node_idx = node_indices->Get(i);
     auto kernal_hash = kernel_def_hashes->Get(i);
 

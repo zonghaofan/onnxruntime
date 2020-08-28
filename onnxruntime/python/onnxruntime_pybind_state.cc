@@ -544,6 +544,14 @@ void RegisterExecutionProvidersWithOptions(InferenceSession* sess, const std::ve
 #if USE_VITISAI
       RegisterExecutionProvider(sess, *onnxruntime::CreateExecutionProviderFactory_VITISAI("dpuv1", 0));
 #endif
+    } else if (type == kAclExecutionProvider) {
+#ifdef USE_ACL
+      RegisterExecutionProvider(sess, *onnxruntime::CreateExecutionProviderFactory_ACL(sess->GetSessionOptions().enable_cpu_mem_arena));
+#endif
+    } else if (type == kArmNNExecutionProvider) {
+#ifdef USE_ARMNN
+      RegisterExecutionProvider(sess, *onnxruntime::CreateExecutionProviderFactory_ArmNN(sess->GetSessionOptions().enable_cpu_mem_arena));
+#endif
     } else {
       // unknown provider
       throw std::runtime_error("Unknown Provider Type: " + type);

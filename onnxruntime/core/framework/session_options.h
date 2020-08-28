@@ -36,7 +36,7 @@ struct SessionOptions {
   std::basic_string<ORTCHAR_T> optimized_model_filepath;
 
   // Format to serialize the model in. ONNX or custom ONNXRuntime format.
-  SerializationFormat optimized_model_format = ORT;
+  SerializationFormat optimized_model_format = ONNX;
 
   // enable the memory pattern optimization.
   // The idea is if the input shapes are the same, we could trace the internal memory allocation

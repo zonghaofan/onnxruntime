@@ -1006,9 +1006,6 @@ class Graph {
 
   static common::Status LoadFromOrtFormat(
       const onnxruntime::experimental::fbs::Graph& fbs_graph, const Model& owning_model,
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-      IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
-#endif
       const std::unordered_map<std::string, int>& domain_to_version,
       const logging::Logger& logger, std::unique_ptr<Graph>& graph);
 
@@ -1026,19 +1023,13 @@ class Graph {
 
   Graph() = delete;
 
-  //
-  // Experimental serialization
-  //
-  // create empty Graph instance to re-create from serialized data.
-  // as the deserialize is more likely to be error prone we're preferring returning a Status from that than throwing
+  // Create empty Graph instance to re-create from ORT format serialized data.
   Graph(const Model& owning_model,
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-        IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
-#endif
         const std::unordered_map<std::string, int>& domain_to_version,
         Graph* parent_graph, const Node* parent_node,
         const logging::Logger& logger);
 
+  // Populate Graph instance from ORT format serialized data.
   common::Status LoadFromOrtFormat(const onnxruntime::experimental::fbs::Graph& fbs_graph);
 
 #if !defined(ORT_MINIMAL_BUILD)

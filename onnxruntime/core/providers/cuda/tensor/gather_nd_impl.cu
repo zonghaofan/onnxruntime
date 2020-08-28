@@ -109,7 +109,7 @@ SPECIALIZED_IMPL(float)
 SPECIALIZED_IMPL(half)
 SPECIALIZED_IMPL(double)
 #endif
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 SPECIALIZED_IMPL(nv_bfloat16)
 #endif
 

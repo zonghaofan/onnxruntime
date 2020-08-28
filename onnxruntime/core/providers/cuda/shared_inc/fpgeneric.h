@@ -101,6 +101,7 @@ inline cublasStatus_t cublasGemmHelper(cublasHandle_t handle,
 #endif
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 inline cublasStatus_t cublasGemmHelper(cublasHandle_t handle,
                                        cublasOperation_t transa,
                                        cublasOperation_t transb,
@@ -129,6 +130,7 @@ inline cublasStatus_t cublasGemmHelper(cublasHandle_t handle,
                       CUBLAS_COMPUTE_32F,
                       CUBLAS_GEMM_DEFAULT);
 }
+#endif
 
 // batched gemm
 inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
@@ -220,6 +222,7 @@ inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
 #endif
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
                                               cublasOperation_t transa,
                                               cublasOperation_t transb,
@@ -249,6 +252,7 @@ inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle,
                              CUDA_R_32F,
                              CUBLAS_GEMM_DEFAULT);
 }
+#endif
 
 // strided batched gemm
 inline cublasStatus_t cublasGemmStridedBatchedHelper(cublasHandle_t handle,
@@ -349,6 +353,7 @@ inline cublasStatus_t cublasGemmStridedBatchedHelper(cublasHandle_t handle,
 #endif
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 inline cublasStatus_t cublasGemmStridedBatchedHelper(cublasHandle_t handle,
                                                      cublasOperation_t transa,
                                                      cublasOperation_t transb,
@@ -380,6 +385,7 @@ inline cublasStatus_t cublasGemmStridedBatchedHelper(cublasHandle_t handle,
                                     CUDA_R_32F,
                                     CUBLAS_GEMM_DEFAULT);
 }
+#endif
 
 // axpy
 inline cublasStatus_t cublasAxpyHelper(cublasHandle_t handle, int n, const float* alpha, const float* x, int incx, float* y, int incy) {
@@ -569,7 +575,9 @@ inline cublasStatus_t cublasCopyHelper(cublasHandle_t handle, int n, const doubl
   return cublasDcopy(handle, n, x, incx, y, incy);
 }
 cublasStatus_t cublasCopyHelper(cublasHandle_t handle, int n, const half* x, int incx, half* y, int incy);
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 cublasStatus_t cublasCopyHelper(cublasHandle_t handle, int n, const nv_bfloat16* x, int incx, nv_bfloat16* y, int incy);
+#endif
 
 // curand
 inline curandStatus_t curandGenerateUniformHelper(curandGenerator_t generator, float* outputPtr, size_t num) {

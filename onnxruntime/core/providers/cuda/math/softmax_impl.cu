@@ -214,7 +214,7 @@ template void dispatch_softmax_forward<input_t, output_t, acc_t, true>(output_t 
 SPECIALIZED_SOFTMAX_IMPL(float, float, float)
 SPECIALIZED_SOFTMAX_IMPL(half, half, float)
 SPECIALIZED_SOFTMAX_IMPL(double, double, double)
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 SPECIALIZED_SOFTMAX_IMPL(nv_bfloat16, nv_bfloat16, float)
 #endif
 

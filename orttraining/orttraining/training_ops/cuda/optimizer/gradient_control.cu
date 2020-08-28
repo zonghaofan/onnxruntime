@@ -46,7 +46,7 @@ SPECIALIZED_IMPL_InPlaceAccumulator(float, half)
 SPECIALIZED_IMPL_InPlaceAccumulator(half, half)
 SPECIALIZED_IMPL_InPlaceAccumulator(half, float)
 
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 SPECIALIZED_IMPL_InPlaceAccumulator(float, nv_bfloat16)
 SPECIALIZED_IMPL_InPlaceAccumulator(nv_bfloat16, nv_bfloat16)
 SPECIALIZED_IMPL_InPlaceAccumulator(nv_bfloat16, float)

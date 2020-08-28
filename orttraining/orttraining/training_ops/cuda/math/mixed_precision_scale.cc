@@ -8,6 +8,7 @@ using namespace onnxruntime::common;
 namespace onnxruntime {
 namespace cuda {
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define REGISTER_MIXEDPRECISIONSCALE_KERNEL_TYPED(SrcT)                       \
   ONNX_OPERATOR_TYPED_KERNEL_EX(                                              \
       MixedPrecisionScale,                                                    \
@@ -23,6 +24,22 @@ namespace cuda {
                                    DataTypeImpl::GetTensorType<MLFloat16>(),  \
                                    DataTypeImpl::GetTensorType<BFloat16>()}), \
       MixedPrecisionScale<SrcT>);
+#else
+#define REGISTER_MIXEDPRECISIONSCALE_KERNEL_TYPED(SrcT)                         \
+  ONNX_OPERATOR_TYPED_KERNEL_EX(                                                \
+      MixedPrecisionScale,                                                      \
+      kMSDomain,                                                                \
+      1,                                                                        \
+      SrcT,                                                                     \
+      kCudaExecutionProvider,                                                   \
+      KernelDefBuilder()                                                        \
+          .TypeConstraint("SrcT", DataTypeImpl::GetTensorType<SrcT>())          \
+          .TypeConstraint("ScaleT", DataTypeImpl::GetTensorType<float>())       \
+          .TypeConstraint("DstT", {DataTypeImpl::GetTensorType<float>(),        \
+                                   DataTypeImpl::GetTensorType<double>(),       \
+                                   DataTypeImpl::GetTensorType<MLFloat16>()}),  \
+      MixedPrecisionScale<SrcT>);
+#endif
 
 Status BytesPerElement(ONNX_NAMESPACE::TensorProto_DataType to, size_t& bytes_per_elem) {
   switch (to) {
@@ -35,9 +52,11 @@ Status BytesPerElement(ONNX_NAMESPACE::TensorProto_DataType to, size_t& bytes_pe
     case ONNX_NAMESPACE::TensorProto_DataType_FLOAT16:
       bytes_per_elem = sizeof(MLFloat16);
       break;
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
     case ONNX_NAMESPACE::TensorProto_DataType_BFLOAT16:
       bytes_per_elem = sizeof(BFloat16);
       break;
+#endif
     default:
       return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Unexpected 'to' argument value: ", to);
   }
@@ -108,7 +127,9 @@ Status MixedPrecisionScale<SrcT>::ComputeInternal(OpKernelContext* context) cons
 
     switch (to_) {
       CASE(TensorProto_DataType_FLOAT16, MLFloat16)
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
       CASE(TensorProto_DataType_BFLOAT16, BFloat16)
+#endif
       CASE(TensorProto_DataType_FLOAT, float)
       default:
         return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "Unexpected 'to' argument value: ", to_);
@@ -119,11 +140,15 @@ Status MixedPrecisionScale<SrcT>::ComputeInternal(OpKernelContext* context) cons
 }
 
 REGISTER_MIXEDPRECISIONSCALE_KERNEL_TYPED(MLFloat16)
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 REGISTER_MIXEDPRECISIONSCALE_KERNEL_TYPED(BFloat16)
+#endif
 REGISTER_MIXEDPRECISIONSCALE_KERNEL_TYPED(float)
 
 template Status MixedPrecisionScale<MLFloat16>::ComputeInternal(OpKernelContext* context) const;
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template Status MixedPrecisionScale<BFloat16>::ComputeInternal(OpKernelContext* context) const;
+#endif
 template Status MixedPrecisionScale<float>::ComputeInternal(OpKernelContext* context) const;
 
 }  // namespace cuda

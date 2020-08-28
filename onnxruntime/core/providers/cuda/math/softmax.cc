@@ -48,6 +48,7 @@ Status SoftMaxComputeHelper(
   return Status::OK();
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template <bool is_log_softmax>
 Status SoftMaxComputeHelper(
     const BFloat16* X,
@@ -67,13 +68,16 @@ Status SoftMaxComputeHelper(
   dispatch_softmax_forward<CudaT, CudaT, AccType<BFloat16>, is_log_softmax>(Y_data, X_data, gsl::narrow_cast<int>(D), gsl::narrow_cast<int>(D), gsl::narrow_cast<int>(N));
   return Status::OK();
 }
+#endif
 
 #define SPECIALIZED_SOFTMAX_HELPER_IMPL(T)                                                                                            \
   template Status SoftMaxComputeHelper<T, false>(const T* input, const TensorShape& shape, T* Y, cudnnHandle_t handle, int64_t axis); \
   template Status SoftMaxComputeHelper<T, true>(const T* input, const TensorShape& shape, T* Y, cudnnHandle_t handle, int64_t axis);
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template Status SoftMaxComputeHelper<false>(const BFloat16* input, const TensorShape& shape, BFloat16* Y, int64_t axis);
 template Status SoftMaxComputeHelper<true>(const BFloat16* input, const TensorShape& shape, BFloat16* Y, int64_t axis);
+#endif
 
 SPECIALIZED_SOFTMAX_HELPER_IMPL(float)
 SPECIALIZED_SOFTMAX_HELPER_IMPL(double)
@@ -147,6 +151,7 @@ Status Softmax<T>::ComputeInternal(OpKernelContext* ctx) const {
   }
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template <>
 Status Softmax<BFloat16>::ComputeInternal(OpKernelContext* ctx) const {
   const Tensor* X = ctx->Input<Tensor>(0);
@@ -164,6 +169,7 @@ Status Softmax<BFloat16>::ComputeInternal(OpKernelContext* ctx) const {
     return SoftMaxComputeHelper<false>(X_data, input_shape, Y_data, axis_);
   }
 }
+#endif
 
 #define SPECIALIZED_COMPUTE(T) \
   REGISTER_KERNEL_TYPED(T)     \
@@ -172,7 +178,9 @@ Status Softmax<BFloat16>::ComputeInternal(OpKernelContext* ctx) const {
 SPECIALIZED_COMPUTE(float)
 SPECIALIZED_COMPUTE(double)
 SPECIALIZED_COMPUTE(MLFloat16)
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 SPECIALIZED_COMPUTE(BFloat16)
+#endif
 
 }  // namespace cuda
 }  // namespace onnxruntime

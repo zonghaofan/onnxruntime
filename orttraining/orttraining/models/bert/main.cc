@@ -295,7 +295,7 @@ Status ParseArguments(int argc, char* argv[], BertParameters& params, OrtParamet
       printf("Mixed precision training is enabled.\n");
     }
     if (params.allreduce_in_mixed_precision_type) {
-      printf("Performing AllReduce in fp16 \n");
+      printf("Performing AllReduce in mixed precision type \n");
     } else {
       printf("Performing AllReduce in fp32 \n");
     }

@@ -121,7 +121,7 @@ void Impl_NoBroadcastInputBatch(
 // D: double
 // O: bool
 
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 #define SPECIALIZE_IMPL_HFD(VariadicElementwiseOpTag)     \
   SPECIALIZE_IMPL(half, VariadicElementwiseOpTag)         \
   SPECIALIZE_IMPL(nv_bfloat16, VariadicElementwiseOpTag)  \

@@ -60,8 +60,9 @@ def main():
         ]
 
         if c.use_mixed_precision: 
-            cmds.append("--use_mixed_precision"),
-            cmds.append("--allreduce_in_fp16"),
+            cmds.append("--mixed_precision_type"),
+            cmds.append("FP16"),
+            cmds.append("--allreduce_in_mixed_precision_type"),
 
         subprocess.run(cmds).check_returncode()
 

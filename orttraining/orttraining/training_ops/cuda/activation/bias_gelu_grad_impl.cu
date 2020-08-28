@@ -87,7 +87,7 @@ SPECIALIZED_BIAS_GELU_GRAD_IMPL(half, gelu_computation_mode::Approximation);
 SPECIALIZED_BIAS_GELU_GRAD_IMPL(float, gelu_computation_mode::Approximation);
 SPECIALIZED_BIAS_GELU_GRAD_IMPL(double, gelu_computation_mode::Approximation);
 
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 SPECIALIZED_BIAS_GELU_GRAD_IMPL(nv_bfloat16, gelu_computation_mode::Default);
 SPECIALIZED_BIAS_GELU_GRAD_IMPL(nv_bfloat16, gelu_computation_mode::Approximation);
 #endif

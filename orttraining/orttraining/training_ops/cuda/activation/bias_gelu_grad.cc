@@ -16,7 +16,11 @@ ONNX_OPERATOR_KERNEL_EX(
     1,
     kCudaExecutionProvider,
     KernelDefBuilder()
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
         .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double, BFloat16>())
+#else
+        .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double>())
+#endif
         .MayInplace(0, 0),
     BiasGeluGrad_dX<gelu_computation_mode::Default>);
 
@@ -26,7 +30,11 @@ ONNX_OPERATOR_KERNEL_EX(
     1,
     kCudaExecutionProvider,
     KernelDefBuilder()
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
         .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double, BFloat16>())
+#else
+        .TypeConstraint("T", BuildKernelDefConstraints<MLFloat16, float, double>())
+#endif
         .MayInplace(0, 0),
     BiasGeluGrad_dX<gelu_computation_mode::Approximation>);
 
@@ -68,9 +76,15 @@ Status BiasGeluGrad_dX<GeluComputationMode>::ComputeInternal(OpKernelContext* co
 
   const auto input_size = input_shape.Size(), bias_size = bias_shape.Size();
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   utils::MLTypeCallDispatcher<
       KernelLaunchDispatcher,
       MLFloat16, float, double, BFloat16>
+#else
+  utils::MLTypeCallDispatcher<
+      KernelLaunchDispatcher,
+      MLFloat16, float, double>
+#endif
       dispatcher{X->GetElementType()};
   dispatcher.Invoke(input_size, bias_size, *dY, *X, *B, *dX);
 

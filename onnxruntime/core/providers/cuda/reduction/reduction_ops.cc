@@ -853,6 +853,7 @@ Status ReduceKernel<true>::ComputeImpl<uint8_t, CUDNN_REDUCE_TENSOR_NO_INDICES>(
   return Status::OK();
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template <>
 template <>
 Status ReduceKernel<true>::ComputeImpl<BFloat16, CUDNN_REDUCE_TENSOR_NO_INDICES>(OpKernelContext* ctx, cudnnReduceTensorOp_t cudnn_reduce_op) const {
@@ -930,6 +931,7 @@ Status ReduceKernel<true>::ComputeImpl<BFloat16, CUDNN_REDUCE_TENSOR_NO_INDICES>
 
   return Status::OK();
 }
+#endif
 
 namespace ReductionOps {
 
@@ -979,11 +981,18 @@ template Tensor ReduceCompute<double, CUDNN_REDUCE_TENSOR_NO_INDICES>(
 
 }  // namespace ReductionOps
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define REGISTER_KERNEL_HFD(name)        \
   REGISTER_KERNEL_TYPED(name, MLFloat16) \
   REGISTER_KERNEL_TYPED(name, BFloat16)  \
   REGISTER_KERNEL_TYPED(name, float)     \
   REGISTER_KERNEL_TYPED(name, double)
+#else
+#define REGISTER_KERNEL_HFD(name)        \
+  REGISTER_KERNEL_TYPED(name, MLFloat16) \
+  REGISTER_KERNEL_TYPED(name, float)     \
+  REGISTER_KERNEL_TYPED(name, double)
+#endif
 
 REGISTER_KERNEL_TYPED_12(ArgMax, MLFloat16)
 REGISTER_KERNEL_TYPED_12(ArgMax, float)

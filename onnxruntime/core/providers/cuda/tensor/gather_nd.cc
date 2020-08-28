@@ -103,6 +103,7 @@ Status GatherNDBase::PrepareCompute(
           .TypeConstraint("Tind", DataTypeImpl::GetTensorType<TIndex>()),   \
       GatherND<TIndex>);
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define REGISTER_KERNEL_TYPED_GATHER_ND(TIndex, ver)                      \
   ONNX_OPERATOR_TYPED_KERNEL_EX(                                          \
       GatherND,                                                           \
@@ -117,6 +118,21 @@ Status GatherNDBase::PrepareCompute(
                                 DataTypeImpl::GetTensorType<BFloat16>()}) \
           .TypeConstraint("Tind", DataTypeImpl::GetTensorType<TIndex>()), \
       GatherND<TIndex>);
+#else
+#define REGISTER_KERNEL_TYPED_GATHER_ND(TIndex, ver)                        \
+  ONNX_OPERATOR_TYPED_KERNEL_EX(                                            \
+      GatherND,                                                             \
+      kOnnxDomain,                                                          \
+      ver,                                                                  \
+      TIndex,                                                               \
+      kCudaExecutionProvider,                                               \
+      KernelDefBuilder()                                                    \
+          .TypeConstraint("T", {DataTypeImpl::GetTensorType<float>(),       \
+                                DataTypeImpl::GetTensorType<double>(),      \
+                                DataTypeImpl::GetTensorType<MLFloat16>()})  \
+          .TypeConstraint("Tind", DataTypeImpl::GetTensorType<TIndex>()),   \
+      GatherND<TIndex>);
+#endif
 
 // TODO: decprecate GatherND-1 after updating training models to opset-12
 #ifdef ENABLE_TRAINING
@@ -178,7 +194,11 @@ Status GatherND<TIndex>::ComputeInternal(OpKernelContext* context) const {
 
   const void* const kernel_input_data = input_tensor->DataRaw();
   void* const kernel_output_data = output_tensor->MutableDataRaw();
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   utils::MLTypeCallDispatcher<GatherNDComputeImpl, float, MLFloat16, double, BFloat16>
+#else
+  utils::MLTypeCallDispatcher<GatherNDComputeImpl, float, MLFloat16, double>
+#endif
       t_disp(input_tensor->GetElementType());
   t_disp.Invoke(num_slices, slice_size, kernel_input_data, kernel_output_data, input_slice_offsets_buffer.get());
 

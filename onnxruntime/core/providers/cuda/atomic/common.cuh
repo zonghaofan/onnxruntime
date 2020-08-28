@@ -19,8 +19,11 @@
 #pragma once
 #include "cuda.h"
 #include "cuda_fp16.h"
-#include "cuda_bf16.h"
 #include "cuda_runtime.h"
+
+#if CUDA_VERSION >= 11000
+#include "cuda_bf16.h"
+#endif
 
 namespace onnxruntime {
 namespace cuda {
@@ -69,7 +72,7 @@ __device__ __forceinline__ void atomic_add(half *address, half value) {
 #endif
 }
 
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 __device__ __forceinline__ void atomic_add(nv_bfloat16 *address, nv_bfloat16 value) {
   unsigned int * base_address = (unsigned int *)((char *)address - ((size_t)address & 2));
   unsigned int old = *base_address;

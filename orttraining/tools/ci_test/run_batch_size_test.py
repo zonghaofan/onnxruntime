@@ -47,7 +47,6 @@ def main():
             "--warmup_mode", "Linear",
             "--gradient_accumulation_steps", "1",
             "--max_predictions_per_seq=20",
-            "--allreduce_in_fp16",
             "--lambda", "0",
             "--use_nccl",
             "--seed", "42",
@@ -55,7 +54,9 @@ def main():
         ]
 
         if config.enable_mixed_precision:
-            cmds.append("--use_mixed_precision"),
+            cmds.append("--mixed_precision_type"),
+            cmds.append("FP16"),
+            cmds.append("--allreduce_in_mixed_precision_type"),
 
         subprocess.run(cmds, timeout=120).check_returncode()
 

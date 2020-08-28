@@ -8,6 +8,7 @@
 namespace onnxruntime {
 namespace cuda {
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define REGISTER_KERNEL_TYPED_GATHER_ND_GRAD(TIndex)                                    \
   ONNX_OPERATOR_TYPED_KERNEL_EX(                                                        \
       GatherNDGrad,                                                                     \
@@ -23,6 +24,22 @@ namespace cuda {
           .TypeConstraint("T1", DataTypeImpl::GetTensorType<int64_t>())                 \
           .InputMemoryType<OrtMemTypeCPUInput>(0),                                      \
       GatherNDGrad<TIndex>);
+#else
+#define REGISTER_KERNEL_TYPED_GATHER_ND_GRAD(TIndex)                                    \
+  ONNX_OPERATOR_TYPED_KERNEL_EX(                                                        \
+      GatherNDGrad,                                                                     \
+      kMSDomain,                                                                        \
+      1,                                                                                \
+      TIndex,                                                                           \
+      kCudaExecutionProvider,                                                           \
+      KernelDefBuilder().TypeConstraint("T", {DataTypeImpl::GetTensorType<MLFloat16>(), \
+                                              DataTypeImpl::GetTensorType<float>(),     \
+                                              DataTypeImpl::GetTensorType<double>()})   \
+          .TypeConstraint("Tind", DataTypeImpl::GetTensorType<TIndex>())                \
+          .TypeConstraint("T1", DataTypeImpl::GetTensorType<int64_t>())                 \
+          .InputMemoryType<OrtMemTypeCPUInput>(0),                                      \
+      GatherNDGrad<TIndex>);
+#endif
 
 REGISTER_KERNEL_TYPED_GATHER_ND_GRAD(int64_t)
 
@@ -85,7 +102,11 @@ Status GatherNDGrad<TIndex>::ComputeInternal(OpKernelContext* context) const {
 
   const void* const kernel_input_data = update_tensor->DataRaw();
   void* const kernel_output_data = output_tensor->MutableDataRaw();
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   utils::MLTypeCallDispatcher<GatherNDGradComputeImpl, float, MLFloat16, double, BFloat16>
+#else
+  utils::MLTypeCallDispatcher<GatherNDGradComputeImpl, float, MLFloat16, double>
+#endif
       t_disp(update_tensor->GetElementType());
   t_disp.Invoke(num_slices, slice_size, kernel_input_data, kernel_output_data, input_slice_offsets_buffer.get());
 

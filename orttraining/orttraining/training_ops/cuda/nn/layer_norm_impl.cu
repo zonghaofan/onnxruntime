@@ -245,7 +245,7 @@ __device__ void cuWelfordMuSigma2(
   }
 }
 
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 template <>
 __device__ void cuWelfordMuSigma2(
     const nv_bfloat16* __restrict__ vals,
@@ -470,7 +470,7 @@ LAYERNORM_LINEAR_IMPL(float, float)
 LAYERNORM_LINEAR_IMPL(half, float)
 LAYERNORM_LINEAR_IMPL(double, double)
 //LAYERNORM_LINEAR_IMPL(half, half)
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 LAYERNORM_LINEAR_IMPL(nv_bfloat16, float)
 #endif
 
@@ -939,7 +939,7 @@ void HostLayerNormGradient(
 LAYERNORMGRAD_IMPL(float, float)
 LAYERNORMGRAD_IMPL(double, double)
 LAYERNORMGRAD_IMPL(half, float)
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 LAYERNORMGRAD_IMPL(nv_bfloat16, float)
 #endif
 

@@ -97,6 +97,7 @@ bool LaunchFastGeluKernel(const cudaDeviceProp& prop, cudaStream_t stream, int i
   return CUDA_CALL(cudaPeekAtLastError());
 }
 
+#if CUDA_VERSION >= 11000 && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
 template <>
 bool LaunchFastGeluKernel(const cudaDeviceProp& prop, cudaStream_t stream, int input_length, int bias_length, const nv_bfloat16* input, const nv_bfloat16* bias, nv_bfloat16* output) {
   constexpr int blockSize = 256;
@@ -105,6 +106,7 @@ bool LaunchFastGeluKernel(const cudaDeviceProp& prop, cudaStream_t stream, int i
 
   return CUDA_CALL(cudaPeekAtLastError());
 }
+#endif
 
 }  // namespace cuda
 }  // namespace contrib

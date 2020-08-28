@@ -200,11 +200,18 @@ Status BinaryElementwise<ShouldBroadcast>::Prepare(OpKernelContext* context, Bin
   BINARY_OP_VERSIONED_TYPED(name, startver, endver, int64_t)          \
   BINARY_OP_VERSIONED_HFD(name, startver, endver)
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define BINARY_OP_HFD(name, ver)        \
   BINARY_OP_TYPED(name, ver, MLFloat16) \
   BINARY_OP_TYPED(name, ver, BFloat16)  \
   BINARY_OP_TYPED(name, ver, float)     \
   BINARY_OP_TYPED(name, ver, double)
+#else
+#define BINARY_OP_HFD(name, ver)        \
+  BINARY_OP_TYPED(name, ver, MLFloat16) \
+  BINARY_OP_TYPED(name, ver, float)     \
+  BINARY_OP_TYPED(name, ver, double)
+#endif
 
 #define BINARY_OP_UZILHFD(name, ver)   \
   BINARY_OP_TYPED(name, ver, uint32_t) \
@@ -228,11 +235,18 @@ Status BinaryElementwise<ShouldBroadcast>::Prepare(OpKernelContext* context, Bin
   BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, int32_t) \
   BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, int64_t)
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define BINARY_OP_REGISTER_HFD(name, ver)                        \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, MLFloat16) \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, BFloat16)  \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, float)     \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, double)
+#else
+#define BINARY_OP_REGISTER_HFD(name, ver)                        \
+  BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, MLFloat16) \
+  BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, float)     \
+  BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, double)
+#endif
 
 #define BINARY_OP_REGISTER_UZILHFD(name, ver)                   \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, uint32_t) \
@@ -241,6 +255,7 @@ Status BinaryElementwise<ShouldBroadcast>::Prepare(OpKernelContext* context, Bin
   BINARY_ELEMENTWISE_REGISTER_KERNEL_TYPED(name, ver, int64_t)  \
   BINARY_OP_REGISTER_HFD(name, ver)
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define BINARY_LOGICALOP_REGISTER_UZILHFD(name, ver)                       \
   BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, uint32_t)  \
   BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, uint64_t)  \
@@ -250,18 +265,42 @@ Status BinaryElementwise<ShouldBroadcast>::Prepare(OpKernelContext* context, Bin
   BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, BFloat16)  \
   BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, float)     \
   BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, double)
+#else
+#define BINARY_LOGICALOP_REGISTER_UZILHFD(name, ver)                       \
+  BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, uint32_t)  \
+  BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, uint64_t)  \
+  BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, int32_t)   \
+  BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, int64_t)   \
+  BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, MLFloat16) \
+  BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, float)     \
+  BINARY_ELEMENTWISE_LOGICALOP_REGISTER_KERNEL_TYPED(name, ver, double)
+#endif
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define BINARY_OP_REGISTER_VERSIONED_HFD(name, startver, endver)                        \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, MLFloat16) \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, BFloat16)  \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, float)     \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, double)
+#else
+#define BINARY_OP_REGISTER_VERSIONED_HFD(name, startver, endver)                        \
+  BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, MLFloat16) \
+  BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, float)     \
+  BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, double)
+#endif
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 #define BINARY_OP_REGISTER_VERSIONED_CLASS_HFD(name, class_name, startver, endver) \
   BINARY_OP_TYPED_VERSIONED_V(name, class_name, startver, endver, MLFloat16)       \
   BINARY_OP_TYPED_VERSIONED_V(name, class_name, startver, endver, BFloat16)        \
   BINARY_OP_TYPED_VERSIONED_V(name, class_name, startver, endver, float)           \
   BINARY_OP_TYPED_VERSIONED_V(name, class_name, startver, endver, double)
+#else
+#define BINARY_OP_REGISTER_VERSIONED_CLASS_HFD(name, class_name, startver, endver) \
+  BINARY_OP_TYPED_VERSIONED_V(name, class_name, startver, endver, MLFloat16)       \
+  BINARY_OP_TYPED_VERSIONED_V(name, class_name, startver, endver, float)           \
+  BINARY_OP_TYPED_VERSIONED_V(name, class_name, startver, endver, double)
+#endif
 
 #define BINARY_OP_REGISTER_VERSIONED_UZILHFD(name, startver, endver)                   \
   BINARY_ELEMENTWISE_REGISTER_KERNEL_VERSIONED_TYPED(name, startver, endver, uint32_t) \

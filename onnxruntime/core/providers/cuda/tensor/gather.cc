@@ -106,7 +106,9 @@ Status Gather::ComputeInternal(OpKernelContext* context) const {
   TYPED_FUNCTION_CALL(uint32_t)
   TYPED_FUNCTION_CALL(uint64_t)
   TYPED_FUNCTION_CALL(MLFloat16)
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   TYPED_FUNCTION_CALL(BFloat16)
+#endif
   TYPED_FUNCTION_CALL(float)
   TYPED_FUNCTION_CALL(double)
   TYPED_FUNCTION_CALL(bool)

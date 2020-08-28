@@ -123,7 +123,7 @@ struct Consts<half> {
   static const float One;
 };
 
-#if __CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__)
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template<>
 struct Consts<nv_bfloat16> {
   static const float Zero;

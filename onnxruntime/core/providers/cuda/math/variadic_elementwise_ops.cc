@@ -194,6 +194,7 @@ Status VariadicElementwiseOp<VariadicElementwiseOpTag, SupportedElementTypes...>
 
 namespace {
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 using SumOp = VariadicElementwiseOp<
     variadic_elementwise_ops::Sum,
     MLFloat16, float, double, BFloat16>;
@@ -210,6 +211,24 @@ const auto k_uzilhfd_datatypes =
     BuildKernelDefConstraints<uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double, BFloat16>();
 const auto k_hfd_datatypes =
     BuildKernelDefConstraints<MLFloat16, float, double, BFloat16>();
+#else
+using SumOp = VariadicElementwiseOp<
+    variadic_elementwise_ops::Sum,
+    MLFloat16, float, double>;
+
+using MinOp = VariadicElementwiseOp<
+    variadic_elementwise_ops::Min,
+    uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double>;
+
+using MaxOp = VariadicElementwiseOp<
+    variadic_elementwise_ops::Max,
+    uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double>;
+
+const auto k_uzilhfd_datatypes =
+    BuildKernelDefConstraints<uint32_t, uint64_t, int32_t, int64_t, MLFloat16, float, double>();
+const auto k_hfd_datatypes =
+    BuildKernelDefConstraints<MLFloat16, float, double>();
+#endif
 
 }  // namespace
 

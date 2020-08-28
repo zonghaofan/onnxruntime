@@ -57,6 +57,7 @@ Status SoftMaxGradComputeHelper(
   return Status::OK();
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template <bool is_log_softmax>
 Status SoftMaxGradComputeHelper(
     const BFloat16* dY,
@@ -80,7 +81,7 @@ Status SoftMaxGradComputeHelper(
   dispatch_softmax_backward<CudaT, CudaT, AccType<BFloat16>, is_log_softmax>(dX_data, dY_data, Y_data, gsl::narrow_cast<int>(D), gsl::narrow_cast<int>(D), gsl::narrow_cast<int>(N));
   return Status::OK();
 }
-
+#endif
 
 #define REGISTER_GRADIENT_KERNEL_TYPED(T)                                       \
   ONNX_OPERATOR_TYPED_KERNEL_EX(                                                \
@@ -120,6 +121,7 @@ Status SoftmaxGrad<T>::ComputeInternal(OpKernelContext* ctx) const {
   }
 }
 
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 template <>
 Status SoftmaxGrad<BFloat16>::ComputeInternal(OpKernelContext* ctx) const {
   const Tensor* dY = ctx->Input<Tensor>(0);
@@ -138,6 +140,7 @@ Status SoftmaxGrad<BFloat16>::ComputeInternal(OpKernelContext* ctx) const {
     return SoftMaxGradComputeHelper<false>(dY_data, input_shape, Y_data, dX_data, axis_);
   }
 }
+#endif
 
 #define SPECIALIZED_GRADIENT(T)     \
   REGISTER_GRADIENT_KERNEL_TYPED(T) \
@@ -146,7 +149,9 @@ Status SoftmaxGrad<BFloat16>::ComputeInternal(OpKernelContext* ctx) const {
 SPECIALIZED_GRADIENT(float)
 SPECIALIZED_GRADIENT(double)
 SPECIALIZED_GRADIENT(MLFloat16)
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
 SPECIALIZED_GRADIENT(BFloat16)
+#endif
 
 }  // namespace cuda
 }  // namespace onnxruntime

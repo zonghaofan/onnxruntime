@@ -542,6 +542,8 @@ common::Status Model::SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
   return Status::OK();
 }
 
+#endif  // !defined(ORT_MINIMAL_BUILD)
+
 Model::Model() : model_path_{} {
 }
 
@@ -574,6 +576,9 @@ common::Status Model::LoadFromOrtFormat(const fbs::Model& fbs_model,
   ir_version_ = fbs_model.ir_version();
 #endif
 
+  // TODO: Can we always serialize a string so the 'if (SRC)' check isn't needed?
+  // Also prefer avoiding the macro and just having a section for full vs. minimal build given we have that
+  // already for model and ir versions.
   SET_MODEL_STR_DATA(fbs_model.producer_name(), model->model_proto_.set_producer_name, producer_name_);
   SET_MODEL_STR_DATA(fbs_model.producer_version(), model->model_proto_.set_producer_version, producer_version_);
   SET_MODEL_STR_DATA(fbs_model.domain(), model->model_proto_.set_domain, domain_);
@@ -589,16 +594,11 @@ common::Status Model::LoadFromOrtFormat(const fbs::Model& fbs_model,
   }
 
   auto fbs_graph = fbs_model.graph();
-  ORT_RETURN_IF_NOT(nullptr != fbs_graph, "fbs_graph cannot be null");
-  ORT_RETURN_IF_ERROR(Graph::LoadFromOrtFormat(*fbs_graph, *model,
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-                                               std::make_shared<SchemaRegistryManager>(),
-#endif
-                                               domain_to_version, logger, model->graph_));
+  ORT_RETURN_IF_NOT(nullptr != fbs_graph, "Invalid serialized model. Graph not found.");
+
+  ORT_RETURN_IF_ERROR(Graph::LoadFromOrtFormat(*fbs_graph, *model, domain_to_version, logger, model->graph_));
 
   return Status::OK();
 }
-
-#endif  // !defined(ORT_MINIMAL_BUILD)
 
 }  // namespace onnxruntime

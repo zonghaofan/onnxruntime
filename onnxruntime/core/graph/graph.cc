@@ -3357,24 +3357,19 @@ std::ostream& operator<<(std::ostream& out, const Graph& graph) {
 Status Graph::LoadFromOrtFormat(
     const onnxruntime::experimental::fbs::Graph& fbs_graph,
     const Model& owning_model,
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-    IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
-#endif
     const std::unordered_map<std::string, int>& domain_to_version,
     const logging::Logger& logger, std::unique_ptr<Graph>& graph) {
   // can't use make_unique as we're calling a private ctor
-  graph.reset(new Graph(owning_model,
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-                        schema_registry,
-#endif
-                        domain_to_version, nullptr, nullptr, logger));
+  graph.reset(new Graph(owning_model, domain_to_version, nullptr, nullptr, logger));
 
   auto status = graph->LoadFromOrtFormat(fbs_graph);
 
-#if !defined(ORT_MODEL_FORMAT_ONLY)
+#if !defined(ORT_MINIMAL_BUILD)
+  // in a full build we run Resolve to fully populate ResolveContext
+  // which will allow optimizers to run or non-ORT EPs to take nodes
   ORT_RETURN_IF_ERROR(graph->Resolve());
 #else
-  // ORT_RETURN_IF_ERROR(graph->SetupResolveContext());
+  // probably nothing required here. validate with model that has nested subgraphs.
 #endif
 
   return status;
@@ -3385,9 +3380,6 @@ Status Graph::LoadFromOrtFormat(const onnxruntime::experimental::fbs::Graph& fbs
                                 const logging::Logger& logger, std::unique_ptr<Graph>& graph) {
   // can't use make_unique as we're calling a private ctor
   graph.reset(new Graph(parent_graph.owning_model_,
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-                        parent_graph.schema_registry_,
-#endif
                         parent_graph.domain_to_version_, &parent_graph, &parent_node,
                         logger));
 
@@ -3395,17 +3387,11 @@ Status Graph::LoadFromOrtFormat(const onnxruntime::experimental::fbs::Graph& fbs
 }
 
 Graph::Graph(const Model& owning_model,
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-             IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
-#endif
              const std::unordered_map<std::string, int>& domain_to_version,
              Graph* parent_graph, const Node* parent_node,
              const logging::Logger& logger)
     : owning_model_(owning_model),
       graph_proto_(&deserialized_proto_data_),
-#if !defined(ORT_MODEL_FORMAT_ONLY)
-      schema_registry_(schema_registry),
-#endif
       domain_to_version_(domain_to_version),
       parent_graph_(parent_graph),
       parent_node_(parent_node),

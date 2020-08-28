@@ -138,6 +138,17 @@ NodeArg::NodeArg(const std::string& name, const TypeProto* p_node_arg_type) {
 
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
+NodeArg::NodeArg(NodeArgInfo&& node_arg_info) {
+  node_arg_info_ = std::move(node_arg_info);
+
+  exists_ = !node_arg_info_.name().empty();
+  if (node_arg_info_.has_type())
+    type_ = DataTypeUtils::ToType(node_arg_info_.type());
+  else {
+    type_ = nullptr;
+  }
+}
+
 const std::string& NodeArg::Name() const noexcept {
   return node_arg_info_.name();
 }
@@ -540,6 +551,93 @@ flatbuffers::Offset<fbs::NodeEdge> Node::GetEdgesOrtFormat(flatbuffers::FlatBuff
   const auto input_edges = get_edges(relationships_.input_edges);
   const auto output_edges = get_edges(relationships_.output_edges);
   return fbs::CreateNodeEdgeDirect(builder, gsl::narrow<uint32_t>(index_), &input_edges, &output_edges);
+}
+
+Status Node::LoadFromOrtFormat(const onnxruntime::experimental::fbs::Node& fbs_node, Graph& graph,
+                               const logging::Logger& logger, std::unique_ptr<Node>& node) {
+  node.reset(new Node(fbs_node.index(), graph));
+  return node->LoadFromOrtFormat(fbs_node, logger);
+}
+
+#define FBS_SET_STR_VAL(VAR, FBS_STR) \
+  if (FBS_STR) {                      \
+    VAR = FBS_STR->str();             \
+  }
+
+Status Node::LoadFromOrtFormat(const onnxruntime::experimental::fbs::Node& fbs_node, const logging::Logger& logger) {
+  (void)logger;
+
+  auto LoadNodeArgsOrtFormat =
+      [&](const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>* fbs_node_arg_names,
+          std::vector<NodeArg*>& node_args) -> Status {
+    node_args.reserve(fbs_node_arg_names->size());
+    if (fbs_node_arg_names) {
+      for (const auto& node_arg_name : *fbs_node_arg_names) {
+        ORT_RETURN_IF_NOT(nullptr != node_arg_name, "node_arg_name cannot be null");
+        node_args.push_back(graph_->GetNodeArg(node_arg_name->str()));
+      }
+    }
+    return Status::OK();
+  };
+
+  FBS_SET_STR_VAL(name_, fbs_node.name());
+  FBS_SET_STR_VAL(description_, fbs_node.doc_string());
+  FBS_SET_STR_VAL(domain_, fbs_node.domain());
+  since_version_ = fbs_node.since_version();
+  FBS_SET_STR_VAL(op_type_, fbs_node.op_type());  // index was set in ctor
+  node_type_ = static_cast<Node::Type>(fbs_node.type());
+  FBS_SET_STR_VAL(execution_provider_type_, fbs_node.execution_provider_type());
+  ORT_RETURN_IF_ERROR(LoadNodeArgsOrtFormat(fbs_node.inputs(), definitions_.input_defs));
+
+  // attributes
+  auto fbs_attributes = fbs_node.attributes();
+  if (fbs_attributes) {
+    for (const auto* fbs_attr : *fbs_attributes) {
+      ORT_RETURN_IF_NOT(nullptr != fbs_attr, "fbs_attr cannot be null");
+      AttributeProto attr_proto;
+      std::unique_ptr<Graph> sub_graph;
+      ORT_RETURN_IF_ERROR(
+          experimental::utils::LoadAttributeOrtFormat(*fbs_attr, attr_proto, sub_graph, *graph_, *this, logger));
+      attr_to_subgraph_map_.emplace(attr_proto.name(), gsl::not_null<Graph*>(sub_graph.get()));
+      subgraphs_.push_back(std::move(sub_graph));
+      AddAttribute(attr_proto.name(), attr_proto);
+    }
+  }
+
+  ORT_RETURN_IF_ERROR(LoadNodeArgsOrtFormat(fbs_node.implicit_inputs(), definitions_.implicit_input_defs));
+
+  {  // input_arg_counts
+    auto fbs_input_arg_counts = fbs_node.input_arg_counts();
+    ORT_RETURN_IF_NOT(nullptr != fbs_input_arg_counts, "fbs_input_arg_counts cannot be null");
+    auto& input_arg_count = definitions_.input_arg_count;
+    input_arg_count.reserve(fbs_input_arg_counts->size());
+    input_arg_count.insert(input_arg_count.begin(), fbs_input_arg_counts->cbegin(), fbs_input_arg_counts->cend());
+  }
+
+  ORT_RETURN_IF_ERROR(LoadNodeArgsOrtFormat(fbs_node.outputs(), definitions_.output_defs));
+
+  return Status::OK();
+}
+
+Status Node::LoadEdgesFromOrtFormat(const onnxruntime::experimental::fbs::NodeEdge& fbs_node_edgs, const Graph& graph) {
+  ORT_RETURN_IF_NOT(fbs_node_edgs.node_index() != index_,
+                    "input index: ", fbs_node_edgs.node_index(), " does not match this index", index_);
+
+  auto add_edges = [&graph](const flatbuffers::Vector<const onnxruntime::experimental::fbs::EdgeEnd*>* fbs_edges,
+                            EdgeSet& edge_set) -> Status {
+    if (fbs_edges) {
+      for (const auto* fbs_edge : *fbs_edges) {
+        ORT_RETURN_IF_NOT(nullptr != fbs_edge, "fbs_edge cannot be null");
+        edge_set.emplace(*graph.GetNode(fbs_edge->node_index()), fbs_edge->src_arg_index(), fbs_edge->dst_arg_index());
+      }
+    }
+    return Status::OK();
+  };
+
+  ORT_RETURN_IF_ERROR(add_edges(fbs_node_edgs.input_edges(), relationships_.input_edges));
+  ORT_RETURN_IF_ERROR(add_edges(fbs_node_edgs.output_edges(), relationships_.output_edges));
+
+  return Status::OK();
 }
 
 void Node::Init(const std::string& name,
@@ -3255,4 +3353,148 @@ std::ostream& operator<<(std::ostream& out, const Graph& graph) {
   return out;
 }
 #endif  // !defined(ORT_MINIMAL_BUILD)
+
+Status Graph::LoadFromOrtFormat(
+    const onnxruntime::experimental::fbs::Graph& fbs_graph,
+    const Model& owning_model,
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+    IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
+#endif
+    const std::unordered_map<std::string, int>& domain_to_version,
+    const logging::Logger& logger, std::unique_ptr<Graph>& graph) {
+  // can't use make_unique as we're calling a private ctor
+  graph.reset(new Graph(owning_model,
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+                        schema_registry,
+#endif
+                        domain_to_version, nullptr, nullptr, logger));
+
+  auto status = graph->LoadFromOrtFormat(fbs_graph);
+
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+  ORT_RETURN_IF_ERROR(graph->Resolve());
+#else
+  // ORT_RETURN_IF_ERROR(graph->SetupResolveContext());
+#endif
+
+  return status;
+}
+
+Status Graph::LoadFromOrtFormat(const onnxruntime::experimental::fbs::Graph& fbs_graph,
+                                Graph& parent_graph, const Node& parent_node,
+                                const logging::Logger& logger, std::unique_ptr<Graph>& graph) {
+  // can't use make_unique as we're calling a private ctor
+  graph.reset(new Graph(parent_graph.owning_model_,
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+                        parent_graph.schema_registry_,
+#endif
+                        parent_graph.domain_to_version_, &parent_graph, &parent_node,
+                        logger));
+
+  return graph->LoadFromOrtFormat(fbs_graph);
+}
+
+Graph::Graph(const Model& owning_model,
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+             IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
+#endif
+             const std::unordered_map<std::string, int>& domain_to_version,
+             Graph* parent_graph, const Node* parent_node,
+             const logging::Logger& logger)
+    : owning_model_(owning_model),
+      graph_proto_(&deserialized_proto_data_),
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+      schema_registry_(schema_registry),
+#endif
+      domain_to_version_(domain_to_version),
+      parent_graph_(parent_graph),
+      parent_node_(parent_node),
+      logger_(logger),
+      is_loaded_from_model_file_(true) {  // true as the Graph isn't manually constructed from scratch
+}
+
+common::Status Graph::LoadFromOrtFormat(const onnxruntime::experimental::fbs::Graph& fbs_graph) {
+  // load initializers
+  auto fbs_initializers = fbs_graph.initializers();
+  if (fbs_initializers) {
+    name_to_initial_tensor_.reserve(fbs_initializers->size());
+    for (const auto* fbs_tensor : *fbs_initializers) {
+      ORT_RETURN_IF_NOT(nullptr != fbs_tensor, "fbs_tensor cannot be null");
+      TensorProto* initializer = deserialized_proto_data_.add_initializer();
+      ORT_RETURN_IF_ERROR(experimental::utils::LoadInitializerOrtFormat(*fbs_tensor, *initializer));
+      name_to_initial_tensor_[initializer->name()] = initializer;
+    }
+  }
+
+  // NodeArgs
+  auto fbs_node_args = fbs_graph.node_args();
+  if (fbs_node_args) {
+    node_args_.reserve(fbs_node_args->size());
+    for (const auto* fbs_value_info : *fbs_node_args) {
+      ORT_RETURN_IF_NOT(nullptr != fbs_value_info, "fbs_value_info cannot be null");
+      NodeArgInfo node_arg_info;
+      ORT_RETURN_IF_ERROR(experimental::utils::LoadValueInfoOrtFormat(*fbs_value_info, node_arg_info));
+      std::unique_ptr<NodeArg> n(new NodeArg(std::move(node_arg_info)));
+      node_args_[n->Name()] = std::move(n);
+    }
+  }
+
+  // Nodes
+  nodes_.reserve(fbs_graph.max_node_index());
+  auto* fbs_nodes = fbs_graph.nodes();
+  if (fbs_nodes != nullptr) {
+    for (const auto* fbs_node : *fbs_nodes) {
+      ORT_RETURN_IF_NOT(nullptr != fbs_node, "fbs_node cannot be null");
+      std::unique_ptr<Node> node;
+      ORT_RETURN_IF_ERROR(Node::LoadFromOrtFormat(*fbs_node, *this, logger_, node));
+      nodes_[node->Index()] = std::move(node);
+      ++num_of_nodes_;
+    }
+  }
+
+  // NodeEdges
+  auto* fbs_node_edges = fbs_graph.node_edges();
+  if (fbs_node_edges != nullptr) {
+    for (const auto* fbs_node_edge : *fbs_node_edges) {
+      ORT_RETURN_IF_NOT(nullptr != fbs_node_edge, "fbs_node_edge cannot be null");
+      nodes_[fbs_node_edge->node_index()]->LoadEdgesFromOrtFormat(*fbs_node_edge, *this);
+    }
+  }
+
+  auto add_node_args = [&](const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>* fbs_node_args,
+                           std::vector<const NodeArg*>& node_args) -> Status {
+    if (fbs_node_args != nullptr) {
+      graph_outputs_.reserve(fbs_node_args->size());
+      for (const auto* fbs_node_arg_name : *fbs_node_args) {
+        ORT_RETURN_IF_NOT(nullptr != fbs_node_arg_name, "fbs_node_arg_name cannot be null");
+        gsl::not_null<NodeArg*> node_arg = GetNodeArg(fbs_node_arg_name->str());
+        node_args.push_back(node_arg);
+      }
+    }
+    return Status::OK();
+  };
+
+  ORT_RETURN_IF_ERROR(add_node_args(fbs_graph.inputs(), graph_inputs_including_initializers_));
+  for (const auto* input_arg : graph_inputs_including_initializers_) {
+    if (name_to_initial_tensor_.count(input_arg->Name()) == 0) {
+      graph_inputs_excluding_initializers_.push_back(input_arg);
+    }
+  }
+
+  ComputeOverridableInitializers();
+
+  ORT_RETURN_IF_ERROR(add_node_args(fbs_graph.outputs(), graph_outputs_));
+
+  auto fbs_outer_scope_node_args = fbs_graph.outer_scope_node_args();
+  if (fbs_outer_scope_node_args != nullptr) {
+    resolve_context_.outer_scope_node_args.reserve(fbs_outer_scope_node_args->size());
+    for (const auto node_arg_name : *fbs_outer_scope_node_args) {
+      ORT_RETURN_IF_NOT(nullptr != node_arg_name, "node_arg_name cannot be null");
+      resolve_context_.outer_scope_node_args.insert(node_arg_name->str());
+    }
+  }
+
+  return Status::OK();
+}
+
 }  // namespace onnxruntime

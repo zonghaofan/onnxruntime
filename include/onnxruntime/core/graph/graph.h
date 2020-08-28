@@ -370,11 +370,17 @@ class Node {
   */
   void ToProto(ONNX_NAMESPACE::NodeProto& proto, bool update_subgraphs = false) const;
 
-  common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
-                                 flatbuffers::Offset<onnxruntime::experimental::fbs::Node>& fbs_node) const;
+  Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
+                         flatbuffers::Offset<onnxruntime::experimental::fbs::Node>& fbs_node) const;
 
   flatbuffers::Offset<onnxruntime::experimental::fbs::NodeEdge>
   GetEdgesOrtFormat(flatbuffers::FlatBufferBuilder& builder) const;
+
+  static Status LoadFromOrtFormat(const onnxruntime::experimental::fbs::Node& fbs_node, Graph& graph,
+                                  const logging::Logger& logger, std::unique_ptr<Node>& node);
+
+  Status LoadFromOrtFormat(const onnxruntime::experimental::fbs::Node& fbs_node, const logging::Logger& logger);
+  Status LoadEdgesFromOrtFormat(const onnxruntime::experimental::fbs::NodeEdge& fbs_node_edgs, const Graph& graph);
 
 #endif
 
@@ -976,8 +982,6 @@ class Graph {
   common::Status SaveToOrtFormat(flatbuffers::FlatBufferBuilder& builder,
                                  flatbuffers::Offset<onnxruntime::experimental::fbs::Graph>& fbs_graph) const;
 
-  common::Status LoadFromOrtFormat();
-
 #endif  // !defined(ORT_MINIMAL_BUILD)
 
   /** Returns the Node containing the GraphProto for this Graph instance if IsSubgraph is true */
@@ -1000,6 +1004,19 @@ class Graph {
 
   virtual ~Graph();
 
+  static common::Status LoadFromOrtFormat(
+      const onnxruntime::experimental::fbs::Graph& fbs_graph, const Model& owning_model,
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+      IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
+#endif
+      const std::unordered_map<std::string, int>& domain_to_version,
+      const logging::Logger& logger, std::unique_ptr<Graph>& graph);
+
+  // deserialize a subgraph
+  static Status LoadFromOrtFormat(const onnxruntime::experimental::fbs::Graph& fbs_graph,
+                                  Graph& parent_graph, const Node& parent_node,
+                                  const logging::Logger& logger, std::unique_ptr<Graph>& graph);
+
  private:
   ORT_DISALLOW_COPY_ASSIGNMENT_AND_MOVE(Graph);
 
@@ -1008,6 +1025,21 @@ class Graph {
   friend class Model;
 
   Graph() = delete;
+
+  //
+  // Experimental serialization
+  //
+  // create empty Graph instance to re-create from serialized data.
+  // as the deserialize is more likely to be error prone we're preferring returning a Status from that than throwing
+  Graph(const Model& owning_model,
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+        IOnnxRuntimeOpSchemaCollectionPtr schema_registry,
+#endif
+        const std::unordered_map<std::string, int>& domain_to_version,
+        Graph* parent_graph, const Node* parent_node,
+        const logging::Logger& logger);
+
+  common::Status LoadFromOrtFormat(const onnxruntime::experimental::fbs::Graph& fbs_graph);
 
 #if !defined(ORT_MINIMAL_BUILD)
   // Constructor: Given a <GraphProto> loaded from model file, construct
@@ -1191,6 +1223,9 @@ class Graph {
   // it's consistent with <*this> graph.
   // This pointer is owned by parent model.
   ONNX_NAMESPACE::GraphProto* graph_proto_;
+
+  // GraphProto that provides storage for the ONNX proto types deserialized from a flexbuffer/flatbuffer
+  ONNX_NAMESPACE::GraphProto deserialized_proto_data_;
 
   InitializedTensorSet name_to_initial_tensor_;
 

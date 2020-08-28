@@ -52,7 +52,7 @@ def run(model, test_only):
         print(f"{final_model} not found.")
         sys.exit(-1)
 
-    run_test_dir(ort_target_path)
+    run_test_dir(final_model)
 
 
 def parse_args():
@@ -79,6 +79,9 @@ def main():
         test_models = [args.model]
 
     for model in test_models:
+        if args.test_only and not args.model:
+            model = re.sub('.onnx$', '.ort', model)
+
         run(model, args.test_only)
 
 

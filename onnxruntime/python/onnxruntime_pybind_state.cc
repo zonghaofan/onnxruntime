@@ -560,7 +560,7 @@ void RegisterExecutionProvidersWithOptions(InferenceSession* sess, const std::ve
  *
  */
 void GenerateProviderOptionsMap(const std::vector<std::string>& providers,
-                                ProviderOptionsVector& provider_options_vector,
+                                const ProviderOptionsVector& provider_options_vector,
                                 ProviderOptionsMap& provider_options_map) {
   if (provider_options_vector.empty() || providers.empty()) {
     return;
@@ -587,7 +587,8 @@ void InitializeSession(InferenceSession* sess, const std::vector<std::string>& p
   OrtPybindThrowIfError(sess->Initialize());
 }
 
-void InitializeSession(InferenceSession* sess, const std::vector<std::string>& provider_types, ProviderOptionsVector& provider_options) {
+void InitializeSession(InferenceSession* sess, const std::vector<std::string>& provider_types,
+                       const ProviderOptionsVector& provider_options) {
   ProviderOptionsMap provider_options_map;
   GenerateProviderOptionsMap(provider_types, provider_options, provider_options_map);
 
@@ -852,6 +853,10 @@ void addObjectMethods(py::module& m, Environment& env) {
       .def_static("cuda", []() { return OrtDevice::GPU; })
       .def_static("default_memory", []() { return OrtDevice::MemType::DEFAULT; });
 
+  py::enum_<SerializationFormat>(m, "SerializationFormat")
+      .value("ONNX", SerializationFormat::ONNX)
+      .value("ORT", SerializationFormat::ORT);
+
   py::class_<SessionIOBinding> binding(m, "SessionIOBinding");
   binding
       .def(py::init<InferenceSession*>())
@@ -964,6 +969,8 @@ Set this option to false if you don't want it. Default is True.)pbdoc")
                      R"pbdoc(Enable profiling for this session. Default is false.)pbdoc")
       .def_readwrite("optimized_model_filepath", &SessionOptions::optimized_model_filepath,
                      R"pbdoc(File path to serialize optimized model. By default, optimized model is not serialized if optimized_model_filepath is not provided.)pbdoc")
+      .def_readwrite("optimized_model_format", &SessionOptions::optimized_model_format,
+                     R"pbdoc(Format to serialize optimized model. )pbdoc")
       .def_readwrite("enable_mem_pattern", &SessionOptions::enable_mem_pattern,
                      R"pbdoc(Enable the memory pattern optimization. Default is true.)pbdoc")
       .def_readwrite("logid", &SessionOptions::session_logid,
@@ -975,9 +982,15 @@ Set this option to false if you don't want it. Default is True.)pbdoc")
                      R"pbdoc(VLOG level if DEBUG build and session_log_verbosity_level is 0.
 Applies to session load, initialization, etc. Default is 0.)pbdoc")
       .def_property(
-          "intra_op_num_threads", [](const SessionOptions* options) -> int { return options->intra_op_param.thread_pool_size; }, [](SessionOptions* options, int value) -> void { options->intra_op_param.thread_pool_size = value; }, R"pbdoc(Sets the number of threads used to parallelize the execution within nodes. Default is 0 to let onnxruntime choose.)pbdoc")
+          "intra_op_num_threads",
+          [](const SessionOptions* options) -> int { return options->intra_op_param.thread_pool_size; },
+          [](SessionOptions* options, int value) -> void { options->intra_op_param.thread_pool_size = value; },
+          R"pbdoc(Sets the number of threads used to parallelize the execution within nodes. Default is 0 to let onnxruntime choose.)pbdoc")
       .def_property(
-          "inter_op_num_threads", [](const SessionOptions* options) -> int { return options->inter_op_param.thread_pool_size; }, [](SessionOptions* options, int value) -> void { options->inter_op_param.thread_pool_size = value; }, R"pbdoc(Sets the number of threads used to parallelize the execution of the graph (across nodes). Default is 0 to let onnxruntime choose.)pbdoc")
+          "inter_op_num_threads",
+          [](const SessionOptions* options) -> int { return options->inter_op_param.thread_pool_size; },
+          [](SessionOptions* options, int value) -> void { options->inter_op_param.thread_pool_size = value; },
+          R"pbdoc(Sets the number of threads used to parallelize the execution of the graph (across nodes). Default is 0 to let onnxruntime choose.)pbdoc")
       .def_readwrite("execution_mode", &SessionOptions::execution_mode,
                      R"pbdoc(Sets the execution mode. Default is sequential.)pbdoc")
       .def_property(
@@ -1152,31 +1165,41 @@ including arg name, arg type (contains both type and shape).)pbdoc")
 
   py::class_<SessionObjectInitializer>(m, "SessionObjectInitializer");
   py::class_<InferenceSession>(m, "InferenceSession", R"pbdoc(This is the main class used to run a model.)pbdoc")
-      // In Python3, a Python bytes object will be passed to C++ functions that accept std::string or char*
-      // without any conversion. So this init method can be used for model file path (string)
-      // and model content (bytes)
-      .def(py::init([&env](const SessionOptions& so, const std::string& arg, bool is_arg_file_name) {
-        // Given arg is the file path. Invoke the corresponding ctor().
-        if (is_arg_file_name) {
-          return onnxruntime::make_unique<InferenceSession>(so, env, arg);
-        }
-
-        // Given arg is the model content as bytes. Invoke the corresponding ctor().
-        std::istringstream buffer(arg);
-        return onnxruntime::make_unique<InferenceSession>(so, env, buffer);
+      .def(py::init([&env](const SessionOptions& so) {
+        return onnxruntime::make_unique<InferenceSession>(so, env);
       }))
+      // In Python3, a Python bytes object will be passed to C++ functions that accept std::string or char*
+      // without any conversion. So this load method can be used for model file path (string) and model content (bytes)
       .def(
-          "load_model", [](InferenceSession* sess, std::vector<std::string>& provider_types) {
-            OrtPybindThrowIfError(sess->Load());
-            InitializeSession(sess, provider_types);
-          },
-          R"pbdoc(Load a model saved in ONNX format.)pbdoc")
-      .def(
-          "load_model", [](InferenceSession* sess, std::vector<std::string>& provider_types, ProviderOptionsVector& provider_options) {
-            OrtPybindThrowIfError(sess->Load());
+          "load_model",
+          [](InferenceSession* sess, const std::string arg, bool is_arg_file_name,
+             std::vector<std::string>& provider_types, ProviderOptionsVector& provider_options) {
+            // Given arg is the file path. Invoke the corresponding ctor().
+            if (is_arg_file_name) {
+              OrtPybindThrowIfError(sess->Load(arg));
+            } else {
+              // Copy bytes into a string stream for model loading.
+              // TODO: Can we avoid the copy and just pass in a pointer to the data in the string directly, or
+              // is istringstream adding some value?
+              std::istringstream buffer(arg);
+              OrtPybindThrowIfError(sess->Load(buffer));
+            }
+
             InitializeSession(sess, provider_types, provider_options);
           },
           R"pbdoc(Load a model saved in ONNX format.)pbdoc")
+      .def(
+          "load_ort_model",
+          [](InferenceSession* sess, const std::string arg, bool is_arg_file_name) {
+            if (is_arg_file_name) {
+              OrtPybindThrowIfError(sess->LoadOrtModel(arg));
+            } else {
+              OrtPybindThrowIfError(sess->LoadOrtModel(arg.data(), arg.size()));
+            }
+
+            InitializeSession(sess, {}, {});
+          },
+          R"pbdoc(Load a model saved in ORT format.)pbdoc")
       .def("run", [](InferenceSession* sess, std::vector<std::string> output_names, std::map<std::string, py::object> pyfeeds, RunOptions* run_options = nullptr) -> std::vector<py::object> {
         NameMLValMap feeds;
         for (auto _ : pyfeeds) {

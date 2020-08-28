@@ -20,8 +20,11 @@ class Session:
     This is the main class used to run a model.
     """
     def __init__(self, sess):
+        self._sess = sess
         self._enable_fallback = True
 
+    # TODO: Can we remove this? If we separate session creation from model loading/initialization
+    # we shouldn't need any 'reset' functionality as the user can change provider info etc. before model load.
     def _reset_session(self):
         "release underlying session object."
         # meta data references session internal structures
@@ -70,12 +73,15 @@ class Session:
         "Return registered execution providers' configurations."
         return self._provider_options
 
+    # TODO: This may not be the best approach vs. simply requiring the providers and options to be specified
+    # at construction time. Otherwise we're keeping memory unnecessarily (path_or_bytes could be bytes) and
+    # causing unexpected side effects (recreating the underlying instance when setting an option)
     def set_providers(self, providers, provider_options=None):
         """
         Register the input list of execution providers. The underlying session is re-created.
 
         :param providers: list of execution providers
-        :param provider_options: list of provider options dict
+        :param provider_options: list of provider options dict for each provider, in the same order as 'providers'
 
         The list of providers is ordered by Priority. For example ['CUDAExecutionProvider', 'CPUExecutionProvider']
         means execute a node using CUDAExecutionProvider if capable, otherwise execute using CPUExecutionProvider.
@@ -175,39 +181,56 @@ class InferenceSession(Session):
     """
     This is the main class used to run a model.
     """
-    def __init__(self, path_or_bytes, sess_options=None, providers=None):
+    def __init__(self, path_or_bytes, sess_options=None, providers=None, provider_options=None,
+                 ort_format_model=False):
         """
         :param path_or_bytes: filename or serialized model in a byte string
         :param sess_options: session options
-        :param providers: providers to use for session. If empty, will use
-            all available providers.
+        :param providers: list of providers to use for session. If empty, will use all available providers.
+        :param provider_options: list of provider options dict for each provider, in the same order as 'providers'
+        :param ort_format_model: True if creating a session with an ORT format model. False for an ONNX format model.
+
         """
-        self._path_or_bytes = path_or_bytes
+
+        if isinstance(path_or_bytes, str):
+            self._model_path = path_or_bytes
+            self._model_bytes = None
+        elif isinstance(path_or_bytes, bytes):
+            self._model_path = None
+            self._model_bytes = path_or_bytes  # TODO: This is bad as we're holding the memory indefinitely
+        else:
+            raise TypeError("Unable to load from type '{0}'".format(type(path_or_bytes)))
+
+        if ort_format_model:
+            if (providers and len(providers) > 0) or (provider_options and len(provider_options) > 0):
+                raise ValueError("ORT format model does not support specifying 'providers' or 'provider_options'")
+
         self._sess_options = sess_options
         self._sess_options_initial = sess_options
-        self._load_model(providers or [])
         self._enable_fallback = True
-        Session.__init__(self, self._sess)
+        self._ort_format_model = ort_format_model
 
-    def _load_model(self, providers, provider_options=None):
-        if isinstance(self._path_or_bytes, str):
-            self._sess = C.InferenceSession(
-                self._sess_options if self._sess_options else C.get_default_session_options(), self._path_or_bytes,
-                True)
-        elif isinstance(self._path_or_bytes, bytes):
-            self._sess = C.InferenceSession(
-                self._sess_options if self._sess_options else C.get_default_session_options(), self._path_or_bytes,
-                False)
-        # elif isinstance(self._path_or_bytes, tuple):
-        # to remove, hidden trick
-        #   self._sess.load_model_no_init(self._path_or_bytes[0], providers)
-        else:
-            raise TypeError("Unable to load from type '{0}'".format(type(self._path_or_bytes)))
+        sess = C.InferenceSession(self._sess_options if self._sess_options else C.get_default_session_options())
+        Session.__init__(self, sess)
 
-        if provider_options:
-            self._sess.load_model(providers, provider_options)
+        self._load_model(providers, provider_options)
+
+    # TODO: Rethink this setup. If someone wants to create a session, change providers/provider options, and then
+    # load the model we should facilitate that instead of always loading the model in the init and re-creating the
+    # inference session when the providers/provider options change. This setup also means we have to hold a reference
+    # to path_or_bytes forever which is not optimal if that is in-memory bytes.
+    def _load_model(self, providers, provider_options):
+
+        if self._model_path:
+            if self._ort_format_model:
+                self._sess.load_ort_model(self._model_path, True)
+            else:
+                self._sess.load_model(self._model_path, True, providers or [], provider_options or [])
         else:
-            self._sess.load_model(providers)
+            if self._ort_format_model:
+                self._sess.load_ort_model(self._model_bytes, False)
+            else:
+                self._sess.load_model(self._model_bytes, False, providers or [], provider_options or [])
 
         self._sess_options = self._sess.session_options
         self._inputs_meta = self._sess.inputs_meta

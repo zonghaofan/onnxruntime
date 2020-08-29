@@ -3399,6 +3399,9 @@ Graph::Graph(const Model& owning_model,
              const logging::Logger& logger)
     : owning_model_(owning_model),
       graph_proto_(&deserialized_proto_data_),
+#if !defined(ORT_MODEL_FORMAT_ONLY)
+      schema_registry_(std::make_shared<SchemaRegistryManager>()),
+#endif
       domain_to_version_(domain_to_version),
       parent_graph_(parent_graph),
       parent_node_(parent_node),

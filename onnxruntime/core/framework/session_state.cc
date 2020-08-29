@@ -780,12 +780,10 @@ Status SessionState::FinalizeSessionState(const std::basic_string<PATH_CHAR_TYPE
   ORT_RETURN_IF_ERROR(CreateSubgraphSessionState());
 
   if (serialized_session_state) {
-    return LoadFromOrtFormat(*serialized_session_state, kernel_registry_manager);
+    ORT_RETURN_IF_ERROR(LoadFromOrtFormat(*serialized_session_state, kernel_registry_manager));
   } else {
 #if !defined(ORT_MINIMAL_BUILD)
     ORT_RETURN_IF_ERROR(PopulateKernelCreateInfo(kernel_registry_manager));
-    return FinalizeSessionStateImpl(graph_location, kernel_registry_manager, nullptr, session_options,
-                                    remove_initializers);
 #else
     ORT_UNUSED_PARAMETER(graph_location);
     ORT_UNUSED_PARAMETER(kernel_registry_manager);
@@ -795,6 +793,9 @@ Status SessionState::FinalizeSessionState(const std::basic_string<PATH_CHAR_TYPE
                   "Serialized session state must be provided from an ORT format model in this build.");
 #endif
   }
+
+  return FinalizeSessionStateImpl(graph_location, kernel_registry_manager, nullptr, session_options,
+                                  remove_initializers);
 }
 
 Status SessionState::FinalizeSessionStateImpl(const std::basic_string<PATH_CHAR_TYPE>& graph_location,

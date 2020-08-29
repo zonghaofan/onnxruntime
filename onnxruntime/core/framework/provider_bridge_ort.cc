@@ -215,14 +215,13 @@ struct ProviderHostImpl : ProviderHost {
     return onnxruntime::make_unique<Provider_OrtMemoryInfo_Impl>(name_, type_, device_ ? static_cast<Provider_OrtDevice_Impl*>(device_)->v_ : OrtDevice(), id_, mem_type_);
   }
 
-  Provider_AllocatorPtr CreateAllocator(const Provider_DeviceAllocatorRegistrationInfo& info,
-                                        OrtDevice::DeviceId device_id = 0,
-                                        bool use_arena = true) override {
-    DeviceAllocatorRegistrationInfo info_real{
-        info.mem_type, [&info](int value) {
+  Provider_AllocatorPtr CreateAllocator(const Provider_AllocatorCreationInfo& info) override {
+    AllocatorCreationInfo info_real{
+        [&info](int value) {
           return std::move(static_cast<Provider_IDeviceAllocator_Impl*>(&*info.factory(value))->p_);
         },
-        info.max_mem};
+        device_id,
+        info.info.max_mem};
 
     return std::make_shared<Provider_IAllocator_Impl>(onnxruntime::CreateAllocator(info_real, device_id, use_arena));
   }

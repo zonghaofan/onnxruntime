@@ -28,7 +28,7 @@ constexpr const char* DNNL_CPU = "DnnlCpu";
 
 DNNLExecutionProvider::DNNLExecutionProvider(const DNNLExecutionProviderInfo& info)
     : Provider_IExecutionProvider{onnxruntime::kDnnlExecutionProvider} {
-  Provider_DeviceAllocatorRegistrationInfo default_memory_info(
+  Provider_AllocatorCreationInfo default_memory_info(
       {OrtMemTypeDefault,
        [](int) {
          return onnxruntime::Provider_CreateCPUAllocator(
@@ -36,7 +36,7 @@ DNNLExecutionProvider::DNNLExecutionProvider(const DNNLExecutionProviderInfo& in
        },
        std::numeric_limits<size_t>::max()});
 
-  Provider_DeviceAllocatorRegistrationInfo cpu_memory_info(
+  Provider_AllocatorCreationInfo cpu_memory_info(
       {OrtMemTypeCPUOutput,
        [](int) {
          return onnxruntime::Provider_CreateCPUAllocator(

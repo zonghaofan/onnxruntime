@@ -96,12 +96,10 @@ KernelRegistryAndStatus GetFusedKernelRegistry() {
 class FuseExecutionProvider : public IExecutionProvider {
  public:
   explicit FuseExecutionProvider() : IExecutionProvider{kFuseExecutionProvider} {
-    DeviceAllocatorRegistrationInfo device_info(
-        {OrtMemTypeDefault,
-         [](int) {
-           return onnxruntime::make_unique<CPUAllocator>(OrtMemoryInfo("Fuse", OrtAllocatorType::OrtDeviceAllocator));
-         },
-         std::numeric_limits<size_t>::max()});
+    AllocatorCreationInfo device_info(
+        {[](int) {
+          return onnxruntime::make_unique<CPUAllocator>(OrtMemoryInfo("Fuse", OrtAllocatorType::OrtDeviceAllocator));
+        }});
     InsertAllocator(device_info.factory(0));
   }
 
@@ -2320,12 +2318,12 @@ TEST(InferenceSessionTests, AllocatorSharing_EnsureSessionsUseSameOrtCreatedAllo
 #endif
   OrtMemoryInfo mem_info{onnxruntime::CPU, use_arena ? OrtArenaAllocator : OrtDeviceAllocator};
   size_t max_mem = std::numeric_limits<size_t>::max();
-  DeviceAllocatorRegistrationInfo device_info{
+  AllocatorCreationInfo device_info{
       OrtMemTypeDefault,
       [mem_info](int) { return onnxruntime::make_unique<TAllocator>(mem_info); },
-      max_mem};
+      0, use_arena};
 
-  AllocatorPtr allocator_ptr = CreateAllocator(device_info, 0, use_arena);
+  AllocatorPtr allocator_ptr = CreateAllocator(device_info);
   st = env->RegisterAllocator(allocator_ptr);
   ASSERT_STATUS_OK(st);
   // create sessions to share the allocator
@@ -2367,12 +2365,11 @@ TEST(InferenceSessionTests, AllocatorSharing_EnsureSessionsDontUseSameOrtCreated
 #endif
   OrtMemoryInfo mem_info{onnxruntime::CPU, use_arena ? OrtArenaAllocator : OrtDeviceAllocator};
   size_t max_mem = std::numeric_limits<size_t>::max();
-  DeviceAllocatorRegistrationInfo device_info{
-      OrtMemTypeDefault,
+  AllocatorCreationInfo device_info{
       [mem_info](int) { return onnxruntime::make_unique<TAllocator>(mem_info); },
-      max_mem};
+      0, use_arena};
 
-  AllocatorPtr allocator_ptr = CreateAllocator(device_info, 0, use_arena);
+  AllocatorPtr allocator_ptr = CreateAllocator(device_info);
   st = env->RegisterAllocator(allocator_ptr);
   ASSERT_STATUS_OK(st);
   // create sessions to share the allocator
